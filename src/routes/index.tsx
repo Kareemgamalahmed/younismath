@@ -144,7 +144,10 @@ function Index() {
         onSubmit={check}
         className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl"
       >
-        <div className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl">
+        <div
+          dir={lang === "ar" ? "rtl" : "ltr"}
+          className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl"
+        >
           <span>{toLang(a, lang)}</span>
           <span className="text-primary">+</span>
           <span>{toLang(b, lang)}</span>
