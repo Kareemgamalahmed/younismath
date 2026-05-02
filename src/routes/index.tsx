@@ -6,9 +6,32 @@ export const Route = createFileRoute("/")({
 });
 
 type Status = "idle" | "correct" | "wrong";
+type Lang = "en" | "ar";
+
+const AR_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+
+function toLang(n: number | string, lang: Lang) {
+  const s = String(n);
+  if (lang === "en") return s;
+  return s
+    .split("")
+    .map((c) => (/\d/.test(c) ? AR_DIGITS[Number(c)] : c))
+    .join("");
+}
+
+function fromAny(s: string) {
+  return s
+    .split("")
+    .map((c) => {
+      const i = AR_DIGITS.indexOf(c);
+      return i >= 0 ? String(i) : c;
+    })
+    .join("")
+    .replace(/[^\d-]/g, "");
+}
 
 function randNum() {
-  return Math.floor(Math.random() * 11); // 0..10
+  return Math.floor(Math.random() * 11);
 }
 
 function Fireworks() {
@@ -41,6 +64,7 @@ function Fireworks() {
 }
 
 function Index() {
+  const [lang, setLang] = useState<Lang>("en");
   const [a, setA] = useState(2);
   const [b, setB] = useState(3);
   const [value, setValue] = useState("");
@@ -63,8 +87,9 @@ function Index() {
 
   function check(e: React.FormEvent) {
     e.preventDefault();
-    if (value.trim() === "") return;
-    const guess = Number(value);
+    const ascii = fromAny(value);
+    if (ascii === "") return;
+    const guess = Number(ascii);
     if (guess === a + b) {
       setStatus("correct");
       setScore((s) => s + 1);
@@ -85,27 +110,48 @@ function Index() {
 
   return (
     <div
-      className={`flex min-h-screen flex-col items-center justify-center px-4 transition-colors duration-300 ${bgClass}`}
+      className={`flex min-h-screen flex-col items-center justify-center px-4 py-6 transition-colors duration-300 ${bgClass}`}
     >
       {showFw && <Fireworks />}
 
-      <div className="mb-8 rounded-full bg-card px-6 py-3 shadow-lg">
-        <span className="text-lg font-semibold text-muted-foreground">Score: </span>
-        <span className="text-2xl font-extrabold text-primary">{score}</span>
+      <div className="mb-4 flex gap-2 rounded-full bg-card p-1 shadow-md">
+        <button
+          type="button"
+          onClick={() => setLang("en")}
+          className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+            lang === "en" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground"
+          }`}
+        >
+          123 English
+        </button>
+        <button
+          type="button"
+          onClick={() => setLang("ar")}
+          className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+            lang === "ar" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground"
+          }`}
+        >
+          ١٢٣ عربي
+        </button>
+      </div>
+
+      <div className="mb-6 flex items-center gap-2 rounded-full bg-card px-6 py-3 shadow-lg">
+        <span className="text-2xl">⭐</span>
+        <span className="text-2xl font-extrabold text-primary">{toLang(score, lang)}</span>
       </div>
 
       <form
         onSubmit={check}
-        className="flex flex-col items-center gap-6 rounded-3xl bg-card p-10 shadow-2xl"
+        className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl"
       >
-        <div className="flex items-center gap-4 text-6xl font-extrabold text-foreground sm:text-7xl">
-          <span>{a}</span>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl">
+          <span>{toLang(a, lang)}</span>
           <span className="text-primary">+</span>
-          <span>{b}</span>
+          <span>{toLang(b, lang)}</span>
           <span className="text-primary">=</span>
           <input
             ref={inputRef}
-            type="number"
+            type="text"
             inputMode="numeric"
             value={value}
             onChange={(e) => {
@@ -113,39 +159,33 @@ function Index() {
               if (status === "wrong") setStatus("idle");
             }}
             disabled={status === "correct"}
-            className="w-28 rounded-2xl border-4 border-primary bg-background px-2 py-2 text-center text-6xl font-extrabold text-foreground outline-none focus:border-primary focus:ring-4 focus:ring-primary/30 sm:w-32 sm:text-7xl"
+            className="w-24 rounded-2xl border-4 border-primary bg-background px-2 py-2 text-center text-5xl font-extrabold text-foreground outline-none focus:ring-4 focus:ring-primary/30 sm:w-28 sm:text-7xl"
           />
         </div>
 
-        <div className="h-16 text-center">
-          {status === "correct" && (
-            <div className="animate-bounce text-5xl">🎉✅🎉</div>
-          )}
-          {status === "wrong" && (
-            <div className="text-5xl">
-              😢❌ <span className="block text-base text-muted-foreground">Try again!</span>
-            </div>
-          )}
+        <div className="flex h-16 items-center justify-center text-center">
+          {status === "correct" && <div className="animate-bounce text-5xl">🎉 ✅ 🎉</div>}
+          {status === "wrong" && <div className="text-5xl">😢 ❌</div>}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-4">
           <button
             type="submit"
-            className="rounded-full bg-primary px-8 py-3 text-lg font-bold text-primary-foreground shadow-lg transition hover:scale-105 active:scale-95"
+            aria-label="Check answer"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-[oklch(0.7_0.18_145)] text-4xl text-white shadow-lg transition hover:scale-110 active:scale-95"
           >
-            Check
+            ✓
           </button>
           <button
             type="button"
             onClick={newQuestion}
-            className="rounded-full bg-secondary px-8 py-3 text-lg font-bold text-secondary-foreground shadow-lg transition hover:scale-105 active:scale-95"
+            aria-label="Next question"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-[oklch(0.75_0.17_60)] text-4xl text-white shadow-lg transition hover:scale-110 active:scale-95"
           >
-            Skip
+            ⟳
           </button>
         </div>
       </form>
-
-      <p className="mt-8 text-sm text-muted-foreground">Solve the sum and press Check ✨</p>
 
       <style>{`
         @keyframes firework {
