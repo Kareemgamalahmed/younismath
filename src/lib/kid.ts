@@ -32,7 +32,3 @@ export function getSessionId(): string {
   return id;
 }
 
-export function Fireworks() {
-  // returned as a component below
-  return null;
-}
