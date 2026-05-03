@@ -9,15 +9,22 @@ export const Route = createFileRoute("/math")({
 });
 
 type Status = "idle" | "correct" | "wrong";
-type Mode = "add" | "compare";
+type QType = "add" | "sub" | "compare";
 
-function randNum(max = 10) {
+function rand(max: number) {
   return Math.floor(Math.random() * (max + 1));
 }
 
+function pickType(): QType {
+  const r = Math.random();
+  if (r < 0.34) return "add";
+  if (r < 0.67) return "sub";
+  return "compare";
+}
+
 function MathPage() {
-  const [mode, setMode] = useState<Mode>("add");
   const [lang, setLang] = useState<Lang>("en");
+  const [qtype, setQtype] = useState<QType>("add");
   const [a, setA] = useState(2);
   const [b, setB] = useState(3);
   const [value, setValue] = useState("");
@@ -28,13 +35,20 @@ function MathPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const savedRef = useRef(false);
 
-  function newQuestion(currentMode: Mode = mode) {
-    if (currentMode === "add") {
-      setA(randNum(10));
-      setB(randNum(10));
+  function newQuestion() {
+    const t = pickType();
+    setQtype(t);
+    if (t === "add") {
+      setA(rand(10));
+      setB(rand(10));
+    } else if (t === "sub") {
+      const x = rand(10);
+      const y = rand(10);
+      setA(Math.max(x, y));
+      setB(Math.min(x, y));
     } else {
-      setA(randNum(100));
-      setB(randNum(100));
+      setA(rand(100));
+      setB(rand(100));
     }
     setValue("");
     setStatus("idle");
@@ -42,28 +56,22 @@ function MathPage() {
   }
 
   useEffect(() => {
-    newQuestion(mode);
-    setScore(0);
-    setTotal(0);
-    savedRef.current = false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+    newQuestion();
+  }, []);
 
   async function saveScore() {
     if (savedRef.current || total === 0) return;
     savedRef.current = true;
     await supabase.from("scores").insert({
       session_id: getSessionId(),
-      lesson: mode === "add" ? "math_add" : "math_compare",
+      lesson: "math",
       correct: score,
       total,
     });
   }
 
   useEffect(() => {
-    const handler = () => {
-      void saveScore();
-    };
+    const handler = () => void saveScore();
     window.addEventListener("beforeunload", handler);
     return () => {
       window.removeEventListener("beforeunload", handler);
@@ -86,11 +94,12 @@ function MathPage() {
     }
   }
 
-  function checkAdd(e: React.FormEvent) {
+  function checkInput(e: React.FormEvent) {
     e.preventDefault();
     const ascii = fromAny(value);
     if (ascii === "") return;
-    handleResult(Number(ascii) === a + b);
+    const expected = qtype === "add" ? a + b : a - b;
+    handleResult(Number(ascii) === expected);
   }
 
   function checkCompare(sym: ">" | "<" | "=") {
@@ -106,6 +115,8 @@ function MathPage() {
         ? "bg-[oklch(0.9_0.15_25)]"
         : "bg-background";
 
+  const opSymbol = qtype === "add" ? "+" : "−";
+
   return (
     <div
       className={`flex min-h-screen flex-col items-center justify-center px-4 py-6 transition-colors duration-300 ${bgClass}`}
@@ -118,27 +129,6 @@ function MathPage() {
       >
         ← Home
       </Link>
-
-      <div className="mb-3 flex gap-2 rounded-full bg-card p-1 shadow-md">
-        <button
-          type="button"
-          onClick={() => setMode("add")}
-          className={`rounded-full px-4 py-2 text-sm font-bold transition ${
-            mode === "add" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-          }`}
-        >
-          ➕ Add
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("compare")}
-          className={`rounded-full px-4 py-2 text-sm font-bold transition ${
-            mode === "compare" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
-          }`}
-        >
-          ⚖️ &gt; &lt; =
-        </button>
-      </div>
 
       <div className="mb-3 flex gap-2 rounded-full bg-card p-1 shadow-md">
         <button
@@ -167,9 +157,9 @@ function MathPage() {
         <span className="text-sm text-muted-foreground">/ {toLang(total, lang)}</span>
       </div>
 
-      {mode === "add" ? (
+      {qtype !== "compare" ? (
         <form
-          onSubmit={checkAdd}
+          onSubmit={checkInput}
           className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl"
         >
           <div
@@ -177,7 +167,7 @@ function MathPage() {
             className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl"
           >
             <span>{toLang(a, lang)}</span>
-            <span className="text-primary">+</span>
+            <span className="text-primary">{opSymbol}</span>
             <span>{toLang(b, lang)}</span>
             <span className="text-primary">=</span>
             <input
@@ -206,7 +196,7 @@ function MathPage() {
             </button>
             <button
               type="button"
-              onClick={() => newQuestion()}
+              onClick={newQuestion}
               aria-label="Next"
               className="flex h-16 w-16 items-center justify-center rounded-full bg-[oklch(0.75_0.17_60)] text-4xl text-white shadow-lg transition hover:scale-110 active:scale-95"
             >
@@ -253,7 +243,7 @@ function MathPage() {
 
           <button
             type="button"
-            onClick={() => newQuestion()}
+            onClick={newQuestion}
             aria-label="Next"
             className="flex h-12 w-12 items-center justify-center rounded-full bg-[oklch(0.75_0.17_60)] text-2xl text-white shadow-lg transition hover:scale-110"
           >
