@@ -7,9 +7,9 @@ export const Route = createFileRoute("/")({
 function Home() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-10 bg-gradient-to-b from-background to-muted px-4 py-10">
-      <h1 className="text-center text-4xl font-extrabold text-foreground sm:text-5xl">
-        🎈 Let&apos;s Learn! 🎈
-      </h1>
+      <div className="text-7xl sm:text-8xl" aria-label="Learning">
+        🎓
+      </div>
 
       <div className="grid w-full max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
         <Link

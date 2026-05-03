@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Fireworks } from "@/components/Fireworks";
 import { getSessionId, toLang } from "@/lib/kid";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,81 +17,94 @@ const WORDS = [
   "حَكَمَ", "سَبَحَ", "طَحَنَ", "نَشَرَ", "حَصَدَ", "خَلَقَ", "ذَبَحَ", "رَكَبَ", "سَكَنَ", "شَكَرَ",
 ];
 
-const FATHA = "\u064E";
+type Status = "idle" | "listening" | "correct" | "wrong";
 
-// Split a word into letter+fatha syllables (handles hamza on alif too)
-function splitSyllables(word: string): string[] {
-  const out: string[] = [];
-  let buf = "";
-  for (const ch of word) {
-    if (ch === FATHA || /[\u064B-\u0652\u0670]/.test(ch)) {
-      buf += ch;
-    } else {
-      if (buf) out.push(buf);
-      buf = ch;
-    }
-  }
-  if (buf) out.push(buf);
-  return out;
-}
-
-type Status = "idle" | "correct" | "wrong";
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+// Normalize Arabic: strip diacritics, normalize alif/hamza variants
+function normalize(s: string): string {
+  return s
+    .replace(/[\u064B-\u065F\u0670]/g, "") // diacritics
+    .replace(/[\u0622\u0623\u0625\u0671]/g, "\u0627") // alif variants -> ا
+    .replace(/[\u0624]/g, "\u0648") // ؤ -> و
+    .replace(/[\u0626]/g, "\u064A") // ئ -> ي
+    .replace(/[\u0629]/g, "\u0647") // ة -> ه
+    .replace(/[\s\u061F\u060C.!?]/g, "")
+    .trim();
 }
 
 function ArabicPage() {
   const [index, setIndex] = useState(0);
-  const [picked, setPicked] = useState<number[]>([]); // indices into shuffled
   const [status, setStatus] = useState<Status>("idle");
+  const [heard, setHeard] = useState("");
   const [score, setScore] = useState(0);
   const [total, setTotal] = useState(0);
   const [showFw, setShowFw] = useState(false);
+  const [supported, setSupported] = useState(true);
+  const recRef = useRef<any>(null);
   const savedRef = useRef(false);
 
   const word = WORDS[index];
-  const syllables = useMemo(() => splitSyllables(word), [word]);
-  const shuffled = useMemo(() => shuffle(syllables.map((s, i) => ({ s, i }))), [word]);
+
+  useEffect(() => {
+    const SR =
+      (typeof window !== "undefined" &&
+        ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) ||
+      null;
+    if (!SR) {
+      setSupported(false);
+      return;
+    }
+    const rec = new SR();
+    rec.lang = "ar-SA";
+    rec.interimResults = false;
+    rec.maxAlternatives = 5;
+    rec.continuous = false;
+    recRef.current = rec;
+  }, []);
 
   function next() {
     setIndex((i) => (i + 1) % WORDS.length);
-    setPicked([]);
     setStatus("idle");
+    setHeard("");
   }
 
-  function pick(shufIdx: number) {
-    if (status !== "idle") return;
-    const correctNextOriginalIdx = picked.length; // expected next original index
-    const chosen = shuffled[shufIdx];
-    if (picked.includes(shufIdx)) return;
-    if (chosen.i !== correctNextOriginalIdx) {
-      setStatus("wrong");
-      setTotal((t) => t + 1);
-      savedRef.current = false;
-      return;
-    }
-    const newPicked = [...picked, shufIdx];
-    setPicked(newPicked);
-    if (newPicked.length === syllables.length) {
-      setStatus("correct");
-      setScore((s) => s + 1);
-      setTotal((t) => t + 1);
-      savedRef.current = false;
-      setShowFw(true);
-      setTimeout(() => setShowFw(false), 1100);
-      setTimeout(next, 1400);
-    }
-  }
+  function listen() {
+    const rec = recRef.current;
+    if (!rec || status === "listening" || status === "correct") return;
+    setHeard("");
+    setStatus("listening");
 
-  function tryAgain() {
-    setPicked([]);
-    setStatus("idle");
+    const target = normalize(word);
+
+    rec.onresult = (ev: any) => {
+      const alts: string[] = [];
+      const res = ev.results[0];
+      for (let i = 0; i < res.length; i++) alts.push(res[i].transcript);
+      setHeard(alts[0] || "");
+      const ok = alts.some((a) => {
+        const n = normalize(a);
+        return n === target || n.includes(target) || target.includes(n);
+      });
+      setTotal((t) => t + 1);
+      savedRef.current = false;
+      if (ok) {
+        setStatus("correct");
+        setScore((s) => s + 1);
+        setShowFw(true);
+        setTimeout(() => setShowFw(false), 1100);
+        setTimeout(next, 1500);
+      } else {
+        setStatus("wrong");
+      }
+    };
+    rec.onerror = () => setStatus("idle");
+    rec.onend = () => {
+      setStatus((s) => (s === "listening" ? "idle" : s));
+    };
+    try {
+      rec.start();
+    } catch {
+      setStatus("idle");
+    }
   }
 
   async function saveScore() {
@@ -145,71 +158,45 @@ function ArabicPage() {
 
       <div
         dir="rtl"
-        className="flex w-full max-w-lg flex-col items-center gap-8 rounded-3xl bg-card p-8 shadow-2xl"
+        className="flex w-full max-w-lg flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl"
       >
-        {/* Line 1: full word */}
         <div className="text-7xl font-extrabold text-foreground sm:text-8xl">{word}</div>
 
-        {/* Line 2: 3 letter boxes (in correct order, with already-tapped highlighted) */}
-        <div className="flex gap-3">
-          {syllables.map((syl, i) => {
-            const done = i < picked.length;
-            return (
-              <div
-                key={i}
-                className={`flex h-20 w-20 items-center justify-center rounded-2xl border-4 text-5xl font-extrabold sm:h-24 sm:w-24 sm:text-6xl ${
-                  done
-                    ? "border-[oklch(0.7_0.18_145)] bg-[oklch(0.95_0.1_145)] text-foreground"
-                    : "border-primary bg-background text-foreground/60"
-                }`}
-              >
-                {done ? syl : "؟"}
-              </div>
-            );
-          })}
-        </div>
-
         <div className="text-center text-sm text-muted-foreground">
-          اضغط الحروف بالترتيب
+          اضغط على الميكروفون واقرأ الكلمة
         </div>
 
-        {/* Shuffled letter buttons */}
-        <div className="flex flex-wrap justify-center gap-3">
-          {shuffled.map((c, idx) => {
-            const used = picked.includes(idx);
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => pick(idx)}
-                disabled={used || status === "correct"}
-                className={`flex h-20 w-20 items-center justify-center rounded-2xl text-5xl font-extrabold shadow-lg transition active:scale-95 sm:h-24 sm:w-24 sm:text-6xl ${
-                  used
-                    ? "bg-muted text-muted-foreground"
-                    : "bg-[oklch(0.88_0.15_60)] text-foreground hover:scale-110"
-                }`}
-              >
-                {c.s}
-              </button>
-            );
-          })}
+        {!supported && (
+          <div className="rounded-xl bg-[oklch(0.9_0.15_25)] px-4 py-2 text-center text-sm text-foreground">
+            المتصفح لا يدعم التعرف على الصوت. استخدم Chrome.
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={listen}
+          disabled={!supported || status === "listening" || status === "correct"}
+          aria-label="Listen"
+          className={`flex h-28 w-28 items-center justify-center rounded-full text-6xl text-white shadow-2xl transition active:scale-95 disabled:opacity-60 ${
+            status === "listening"
+              ? "animate-pulse bg-[oklch(0.6_0.22_25)]"
+              : "bg-[oklch(0.65_0.2_260)] hover:scale-110"
+          }`}
+        >
+          🎤
+        </button>
+
+        <div className="min-h-8 text-center text-lg font-bold text-foreground">
+          {heard && <span>سمعت: {heard}</span>}
         </div>
 
         <div className="flex h-12 items-center justify-center">
           {status === "correct" && <div className="animate-bounce text-4xl">🎉 ✅ 🎉</div>}
           {status === "wrong" && <div className="text-4xl">😢 ❌</div>}
+          {status === "listening" && <div className="text-2xl">… يستمع</div>}
         </div>
 
         <div className="flex gap-4">
-          {status === "wrong" && (
-            <button
-              type="button"
-              onClick={tryAgain}
-              className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow"
-            >
-              حاول مرة أخرى
-            </button>
-          )}
           <button
             type="button"
             onClick={next}
