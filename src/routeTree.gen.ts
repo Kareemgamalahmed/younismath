@@ -10,11 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as MathRouteImport } from './routes/math'
+import { Route as HistoryRouteImport } from './routes/history'
+import { Route as ArabicRouteImport } from './routes/arabic'
 import { Route as IndexRouteImport } from './routes/index'
 
 const MathRoute = MathRouteImport.update({
   id: '/math',
   path: '/math',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArabicRoute = ArabicRouteImport.update({
+  id: '/arabic',
+  path: '/arabic',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,27 +37,35 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/arabic': typeof ArabicRoute
+  '/history': typeof HistoryRoute
   '/math': typeof MathRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/arabic': typeof ArabicRoute
+  '/history': typeof HistoryRoute
   '/math': typeof MathRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/arabic': typeof ArabicRoute
+  '/history': typeof HistoryRoute
   '/math': typeof MathRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/math'
+  fullPaths: '/' | '/arabic' | '/history' | '/math'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/math'
-  id: '__root__' | '/' | '/math'
+  to: '/' | '/arabic' | '/history' | '/math'
+  id: '__root__' | '/' | '/arabic' | '/history' | '/math'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArabicRoute: typeof ArabicRoute
+  HistoryRoute: typeof HistoryRoute
   MathRoute: typeof MathRoute
 }
 
@@ -56,6 +76,20 @@ declare module '@tanstack/react-router' {
       path: '/math'
       fullPath: '/math'
       preLoaderRoute: typeof MathRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/arabic': {
+      id: '/arabic'
+      path: '/arabic'
+      fullPath: '/arabic'
+      preLoaderRoute: typeof ArabicRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,6 +104,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArabicRoute: ArabicRoute,
+  HistoryRoute: HistoryRoute,
   MathRoute: MathRoute,
 }
 export const routeTree = rootRouteImport
