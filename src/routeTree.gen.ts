@@ -9,8 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as MathRouteImport } from './routes/math'
+import { Route as HistoryRouteImport } from './routes/history'
+import { Route as ArabicRouteImport } from './routes/arabic'
 import { Route as IndexRouteImport } from './routes/index'
 
+const MathRoute = MathRouteImport.update({
+  id: '/math',
+  path: '/math',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArabicRoute = ArabicRouteImport.update({
+  id: '/arabic',
+  path: '/arabic',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +37,61 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/arabic': typeof ArabicRoute
+  '/history': typeof HistoryRoute
+  '/math': typeof MathRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/arabic': typeof ArabicRoute
+  '/history': typeof HistoryRoute
+  '/math': typeof MathRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/arabic': typeof ArabicRoute
+  '/history': typeof HistoryRoute
+  '/math': typeof MathRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/arabic' | '/history' | '/math'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/arabic' | '/history' | '/math'
+  id: '__root__' | '/' | '/arabic' | '/history' | '/math'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArabicRoute: typeof ArabicRoute
+  HistoryRoute: typeof HistoryRoute
+  MathRoute: typeof MathRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/math': {
+      id: '/math'
+      path: '/math'
+      fullPath: '/math'
+      preLoaderRoute: typeof MathRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/arabic': {
+      id: '/arabic'
+      path: '/arabic'
+      fullPath: '/arabic'
+      preLoaderRoute: typeof ArabicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,16 +104,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArabicRoute: ArabicRoute,
+  HistoryRoute: HistoryRoute,
+  MathRoute: MathRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
