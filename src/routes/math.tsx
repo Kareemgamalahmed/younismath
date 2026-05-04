@@ -9,22 +9,15 @@ export const Route = createFileRoute("/math")({
 });
 
 type Status = "idle" | "correct" | "wrong";
-type QType = "add" | "sub" | "compare";
+type Mode = "menu" | "add" | "compare";
 
 function rand(max: number) {
   return Math.floor(Math.random() * (max + 1));
 }
 
-function pickType(): QType {
-  const r = Math.random();
-  if (r < 0.34) return "add";
-  if (r < 0.67) return "sub";
-  return "compare";
-}
-
 function MathPage() {
+  const [mode, setMode] = useState<Mode>("menu");
   const [lang, setLang] = useState<Lang>("en");
-  const [qtype, setQtype] = useState<QType>("add");
   const [a, setA] = useState(2);
   const [b, setB] = useState(3);
   const [value, setValue] = useState("");
@@ -35,18 +28,11 @@ function MathPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const savedRef = useRef(false);
 
-  function newQuestion() {
-    const t = pickType();
-    setQtype(t);
-    if (t === "add") {
+  function newQuestion(m: Mode = mode) {
+    if (m === "add") {
       setA(rand(10));
       setB(rand(10));
-    } else if (t === "sub") {
-      const x = rand(10);
-      const y = rand(10);
-      setA(Math.max(x, y));
-      setB(Math.min(x, y));
-    } else {
+    } else if (m === "compare") {
       setA(rand(100));
       setB(rand(100));
     }
@@ -56,8 +42,9 @@ function MathPage() {
   }
 
   useEffect(() => {
-    newQuestion();
-  }, []);
+    if (mode !== "menu") newQuestion(mode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   async function saveScore() {
     if (savedRef.current || total === 0) return;
@@ -98,8 +85,7 @@ function MathPage() {
     e.preventDefault();
     const ascii = fromAny(value);
     if (ascii === "") return;
-    const expected = qtype === "add" ? a + b : a - b;
-    handleResult(Number(ascii) === expected);
+    handleResult(Number(ascii) === a + b);
   }
 
   function checkCompare(sym: ">" | "<" | "=") {
@@ -115,22 +101,65 @@ function MathPage() {
         ? "bg-[oklch(0.9_0.15_25)]"
         : "bg-background";
 
-  const opSymbol = qtype === "add" ? "+" : "−";
+  if (mode === "menu") {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-10 bg-gradient-to-b from-background to-muted px-4 py-10">
+        <Link
+          to="/"
+          className="absolute left-4 top-4 rounded-full bg-card px-4 py-2 text-sm font-bold shadow"
+        >
+          ← Home
+        </Link>
+        <div className="text-6xl">🔢</div>
+        <div className="grid w-full max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setMode("add")}
+            className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+          >
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.85_0.18_145)] text-6xl shadow-lg group-hover:rotate-6 transition">
+              ➕
+            </div>
+            <div className="text-2xl font-extrabold text-foreground">Add</div>
+            <div className="text-sm text-muted-foreground">2 + 3 = ?</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMode("compare")}
+            className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+          >
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.85_0.15_220)] text-5xl font-extrabold shadow-lg group-hover:-rotate-6 transition">
+              {"< = >"}
+            </div>
+            <div className="text-2xl font-extrabold text-foreground">Compare</div>
+            <div className="text-sm text-muted-foreground">5 ? 8</div>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      className={`flex min-h-screen flex-col items-center justify-center px-4 py-6 transition-colors duration-300 ${bgClass}`}
+      className={`flex min-h-screen flex-col items-center px-4 py-6 transition-colors duration-300 ${bgClass}`}
     >
       {showFw && <Fireworks />}
 
-      <Link
-        to="/"
+      <button
+        type="button"
+        onClick={() => {
+          void saveScore();
+          setMode("menu");
+          setScore(0);
+          setTotal(0);
+        }}
         className="absolute left-4 top-4 rounded-full bg-card px-4 py-2 text-sm font-bold shadow"
       >
-        ← Home
-      </Link>
+        ← Menu
+      </button>
 
-      <div className="mb-3 flex gap-2 rounded-full bg-card p-1 shadow-md">
+      <div className="mb-3 mt-2 flex gap-2 rounded-full bg-card p-1 shadow-md">
         <button
           type="button"
           onClick={() => setLang("en")}
@@ -151,23 +180,20 @@ function MathPage() {
         </button>
       </div>
 
-      <div className="mb-6 flex items-center gap-4 rounded-full bg-card px-6 py-3 shadow-lg">
+      <div className="mb-4 flex items-center gap-4 rounded-full bg-card px-6 py-3 shadow-lg">
         <span className="text-2xl">⭐</span>
         <span className="text-2xl font-extrabold text-primary">{toLang(score, lang)}</span>
         <span className="text-sm text-muted-foreground">/ {toLang(total, lang)}</span>
       </div>
 
-      {qtype !== "compare" ? (
+      {mode === "add" ? (
         <form
           onSubmit={checkInput}
           className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl"
         >
-          <div
-            dir={lang === "ar" ? "rtl" : "ltr"}
-            className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl"
-          >
+          <div className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl">
             <span>{toLang(a, lang)}</span>
-            <span className="text-primary">{opSymbol}</span>
+            <span className="text-primary">+</span>
             <span>{toLang(b, lang)}</span>
             <span className="text-primary">=</span>
             <input
@@ -196,7 +222,7 @@ function MathPage() {
             </button>
             <button
               type="button"
-              onClick={newQuestion}
+              onClick={() => newQuestion()}
               aria-label="Next"
               className="flex h-16 w-16 items-center justify-center rounded-full bg-[oklch(0.75_0.17_60)] text-4xl text-white shadow-lg transition hover:scale-110 active:scale-95"
             >
@@ -206,10 +232,8 @@ function MathPage() {
         </form>
       ) : (
         <div className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl">
-          <div
-            dir={lang === "ar" ? "rtl" : "ltr"}
-            className="flex items-center justify-center gap-4 text-5xl font-extrabold text-foreground sm:text-6xl"
-          >
+          {/* Always LTR so the left number is mathematically the left operand */}
+          <div className="flex items-center justify-center gap-4 text-5xl font-extrabold text-foreground sm:text-6xl">
             <span>{toLang(a, lang)}</span>
             <span
               className={`flex h-16 w-16 items-center justify-center rounded-2xl border-4 ${
@@ -243,7 +267,7 @@ function MathPage() {
 
           <button
             type="button"
-            onClick={newQuestion}
+            onClick={() => newQuestion()}
             aria-label="Next"
             className="flex h-12 w-12 items-center justify-center rounded-full bg-[oklch(0.75_0.17_60)] text-2xl text-white shadow-lg transition hover:scale-110"
           >
@@ -251,6 +275,8 @@ function MathPage() {
           </button>
         </div>
       )}
+
+      <Abacus />
     </div>
   );
 }
@@ -260,6 +286,64 @@ function Feedback({ status }: { status: Status }) {
     <div className="flex h-16 items-center justify-center text-center">
       {status === "correct" && <div className="animate-bounce text-5xl">🎉 ✅ 🎉</div>}
       {status === "wrong" && <div className="text-5xl">😢 ❌</div>}
+    </div>
+  );
+}
+
+const ROW_COLORS = [
+  "oklch(0.75 0.18 25)", // red
+  "oklch(0.75 0.18 25)",
+  "oklch(0.75 0.18 230)", // blue
+  "oklch(0.75 0.18 230)",
+];
+
+function Abacus() {
+  return (
+    <div className="mt-6 w-full max-w-md rounded-3xl bg-card p-4 shadow-xl">
+      <div className="mb-2 text-center text-xs font-bold text-muted-foreground">
+        Slide the beads to count 👇
+      </div>
+      <div className="flex flex-col gap-2">
+        {ROW_COLORS.map((color, rowIdx) => (
+          <AbacusRow key={rowIdx} color={color} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AbacusRow({ color }: { color: string }) {
+  const [left, setLeft] = useState(10);
+  const beads = Array.from({ length: 10 });
+  return (
+    <div className="relative h-12 rounded-full bg-[oklch(0.95_0.01_85)] px-2">
+      <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[oklch(0.7_0.05_60)]" />
+      <div className="relative flex h-full items-center">
+        <div className="flex flex-1 items-center justify-start gap-1">
+          {beads.slice(0, 10 - left).map((_, i) => (
+            <button
+              key={`l${i}`}
+              type="button"
+              onClick={() => setLeft((l) => Math.min(10, l + 1))}
+              className="h-9 w-9 rounded-full border-2 border-[oklch(0.3_0.05_60)] shadow-md transition hover:scale-110 active:scale-95"
+              style={{ background: color }}
+              aria-label="Move bead right"
+            />
+          ))}
+        </div>
+        <div className="flex flex-1 items-center justify-end gap-1">
+          {beads.slice(0, left).map((_, i) => (
+            <button
+              key={`r${i}`}
+              type="button"
+              onClick={() => setLeft((l) => Math.max(0, l - 1))}
+              className="h-9 w-9 rounded-full border-2 border-[oklch(0.3_0.05_60)] shadow-md transition hover:scale-110 active:scale-95"
+              style={{ background: color }}
+              aria-label="Move bead left"
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
