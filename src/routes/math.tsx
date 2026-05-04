@@ -290,82 +290,57 @@ function Feedback({ status }: { status: Status }) {
   );
 }
 
-const ROW_COLORS = [
-  "oklch(0.75 0.18 25)", // red
-  "oklch(0.75 0.18 25)",
-  "oklch(0.75 0.18 230)", // blue
-  "oklch(0.75 0.18 230)",
-];
+const COL_COLORS = ["oklch(0.75 0.18 25)", "oklch(0.75 0.18 230)"];
+const MAX_STACK = 15;
 
 function Abacus() {
   return (
-    <div className="mt-6 w-full max-w-md rounded-3xl bg-card p-4 shadow-xl">
+    <div className="mt-4 w-full max-w-md rounded-3xl bg-card p-3 shadow-xl">
       <div className="mb-2 text-center text-xs font-bold text-muted-foreground">
-        Slide the beads to count 👇
+        Tap a column to stack circles 👇
       </div>
-      <div className="flex flex-col gap-2">
-        {ROW_COLORS.map((color, rowIdx) => (
-          <AbacusRow key={rowIdx} color={color} />
+      <div className="flex justify-center gap-6">
+        {COL_COLORS.map((c, i) => (
+          <StackColumn key={i} color={c} />
         ))}
       </div>
     </div>
   );
 }
 
-const BEAD_COUNT = 10;
-
-function AbacusRow({ color }: { color: string }) {
-  const [left, setLeft] = useState(BEAD_COUNT);
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  function updateFromX(clientX: number) {
-    const el = trackRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    // ratio 0 => all beads on left (left=0); ratio 1 => all on right (left=BEAD_COUNT)
-    setLeft(Math.round(ratio * BEAD_COUNT));
-  }
-
-  function onPointerDown(e: React.PointerEvent) {
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    updateFromX(e.clientX);
-  }
-  function onPointerMove(e: React.PointerEvent) {
-    if (e.buttons !== 1 && e.pointerType === "mouse") return;
-    if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
-      updateFromX(e.clientX);
-    }
-  }
-
-  const beads = Array.from({ length: BEAD_COUNT });
+function StackColumn({ color }: { color: string }) {
+  const [count, setCount] = useState(0);
   return (
-    <div
-      ref={trackRef}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      className="relative h-8 touch-none select-none rounded-full bg-[oklch(0.95_0.01_85)] px-1"
-    >
-      <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-[oklch(0.7_0.05_60)]" />
-      <div className="relative flex h-full items-center">
-        <div className="flex flex-1 items-center justify-start gap-1">
-          {beads.slice(0, BEAD_COUNT - left).map((_, i) => (
-            <div
-              key={`l${i}`}
-              className="h-6 w-6 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm"
-              style={{ background: color }}
-            />
-          ))}
-        </div>
-        <div className="flex flex-1 items-center justify-end gap-1">
-          {beads.slice(0, left).map((_, i) => (
-            <div
-              key={`r${i}`}
-              className="h-6 w-6 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm"
-              style={{ background: color }}
-            />
-          ))}
-        </div>
+    <div className="flex flex-col items-center gap-1">
+      <button
+        type="button"
+        onClick={() => setCount((c) => Math.min(MAX_STACK, c + 1))}
+        className="relative flex h-72 w-12 flex-col-reverse items-center justify-start gap-1 rounded-full border-2 border-[oklch(0.7_0.05_60)] bg-[oklch(0.97_0.01_85)] p-1 transition active:scale-[0.98]"
+      >
+        {Array.from({ length: count }).map((_, i) => (
+          <span
+            key={i}
+            className="h-8 w-8 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm"
+            style={{ background: color }}
+          />
+        ))}
+      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setCount((c) => Math.max(0, c - 1))}
+          className="rounded-full bg-card px-3 py-1 text-xs font-bold shadow"
+        >
+          −
+        </button>
+        <span className="min-w-6 text-center text-sm font-extrabold text-foreground">{count}</span>
+        <button
+          type="button"
+          onClick={() => setCount(0)}
+          className="rounded-full bg-card px-3 py-1 text-xs font-bold shadow"
+        >
+          ⟳
+        </button>
       </div>
     </div>
   );
