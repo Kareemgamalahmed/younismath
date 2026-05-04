@@ -312,36 +312,57 @@ function Abacus() {
   );
 }
 
-const BEAD_COUNT = 20;
+const BEAD_COUNT = 10;
 
 function AbacusRow({ color }: { color: string }) {
   const [left, setLeft] = useState(BEAD_COUNT);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  function updateFromX(clientX: number) {
+    const el = trackRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    // ratio 0 => all beads on left (left=0); ratio 1 => all on right (left=BEAD_COUNT)
+    setLeft(Math.round(ratio * BEAD_COUNT));
+  }
+
+  function onPointerDown(e: React.PointerEvent) {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    updateFromX(e.clientX);
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (e.buttons !== 1 && e.pointerType === "mouse") return;
+    if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) {
+      updateFromX(e.clientX);
+    }
+  }
+
   const beads = Array.from({ length: BEAD_COUNT });
   return (
-    <div className="relative h-7 rounded-full bg-[oklch(0.95_0.01_85)] px-1">
+    <div
+      ref={trackRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      className="relative h-8 touch-none select-none rounded-full bg-[oklch(0.95_0.01_85)] px-1"
+    >
       <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-[oklch(0.7_0.05_60)]" />
       <div className="relative flex h-full items-center">
-        <div className="flex flex-1 items-center justify-start gap-px">
+        <div className="flex flex-1 items-center justify-start gap-1">
           {beads.slice(0, BEAD_COUNT - left).map((_, i) => (
-            <button
+            <div
               key={`l${i}`}
-              type="button"
-              onClick={() => setLeft((l) => Math.min(BEAD_COUNT, l + 1))}
-              className="h-5 w-5 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm transition active:scale-90"
+              className="h-6 w-6 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm"
               style={{ background: color }}
-              aria-label="Move bead right"
             />
           ))}
         </div>
-        <div className="flex flex-1 items-center justify-end gap-px">
+        <div className="flex flex-1 items-center justify-end gap-1">
           {beads.slice(0, left).map((_, i) => (
-            <button
+            <div
               key={`r${i}`}
-              type="button"
-              onClick={() => setLeft((l) => Math.max(0, l - 1))}
-              className="h-5 w-5 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm transition active:scale-90"
+              className="h-6 w-6 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm"
               style={{ background: color }}
-              aria-label="Move bead left"
             />
           ))}
         </div>
