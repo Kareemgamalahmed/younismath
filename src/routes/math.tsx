@@ -276,7 +276,7 @@ function MathPage() {
         </div>
       )}
 
-      <Abacus />
+      {mode === "add" && <Abacus />}
     </div>
   );
 }
@@ -312,32 +312,34 @@ function Abacus() {
   );
 }
 
+const BEAD_COUNT = 20;
+
 function AbacusRow({ color }: { color: string }) {
-  const [left, setLeft] = useState(10);
-  const beads = Array.from({ length: 10 });
+  const [left, setLeft] = useState(BEAD_COUNT);
+  const beads = Array.from({ length: BEAD_COUNT });
   return (
-    <div className="relative h-12 rounded-full bg-[oklch(0.95_0.01_85)] px-2">
-      <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[oklch(0.7_0.05_60)]" />
+    <div className="relative h-7 rounded-full bg-[oklch(0.95_0.01_85)] px-1">
+      <div className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-[oklch(0.7_0.05_60)]" />
       <div className="relative flex h-full items-center">
-        <div className="flex flex-1 items-center justify-start gap-1">
-          {beads.slice(0, 10 - left).map((_, i) => (
+        <div className="flex flex-1 items-center justify-start gap-px">
+          {beads.slice(0, BEAD_COUNT - left).map((_, i) => (
             <button
               key={`l${i}`}
               type="button"
-              onClick={() => setLeft((l) => Math.min(10, l + 1))}
-              className="h-9 w-9 rounded-full border-2 border-[oklch(0.3_0.05_60)] shadow-md transition hover:scale-110 active:scale-95"
+              onClick={() => setLeft((l) => Math.min(BEAD_COUNT, l + 1))}
+              className="h-5 w-5 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm transition active:scale-90"
               style={{ background: color }}
               aria-label="Move bead right"
             />
           ))}
         </div>
-        <div className="flex flex-1 items-center justify-end gap-1">
+        <div className="flex flex-1 items-center justify-end gap-px">
           {beads.slice(0, left).map((_, i) => (
             <button
               key={`r${i}`}
               type="button"
               onClick={() => setLeft((l) => Math.max(0, l - 1))}
-              className="h-9 w-9 rounded-full border-2 border-[oklch(0.3_0.05_60)] shadow-md transition hover:scale-110 active:scale-95"
+              className="h-5 w-5 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm transition active:scale-90"
               style={{ background: color }}
               aria-label="Move bead left"
             />
