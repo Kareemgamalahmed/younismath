@@ -191,7 +191,10 @@ function MathPage() {
           onSubmit={checkInput}
           className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl"
         >
-          <div className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl">
+          <div
+            dir={lang === "ar" ? "rtl" : "ltr"}
+            className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl"
+          >
             <span>{toLang(a, lang)}</span>
             <span className="text-primary">+</span>
             <span>{toLang(b, lang)}</span>
@@ -276,7 +279,7 @@ function MathPage() {
         </div>
       )}
 
-      {mode === "add" && <Abacus />}
+      {mode === "add" && <Abacus resetKey={`${a}-${b}-${total}`} />}
     </div>
   );
 }
@@ -293,15 +296,15 @@ function Feedback({ status }: { status: Status }) {
 const COL_COLORS = ["oklch(0.75 0.18 25)", "oklch(0.75 0.18 230)"];
 const MAX_STACK = 15;
 
-function Abacus() {
+function Abacus({ resetKey }: { resetKey: string }) {
   return (
     <div className="mt-4 w-full max-w-md rounded-3xl bg-card p-3 shadow-xl">
       <div className="mb-2 text-center text-xs font-bold text-muted-foreground">
         Tap a column to stack circles 👇
       </div>
-      <div className="flex justify-center gap-6">
+      <div className="flex justify-center gap-8">
         {COL_COLORS.map((c, i) => (
-          <StackColumn key={i} color={c} />
+          <StackColumn key={`${resetKey}-${i}`} color={c} />
         ))}
       </div>
     </div>
@@ -311,16 +314,16 @@ function Abacus() {
 function StackColumn({ color }: { color: string }) {
   const [count, setCount] = useState(0);
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-2">
       <button
         type="button"
         onClick={() => setCount((c) => Math.min(MAX_STACK, c + 1))}
-        className="relative flex h-72 w-12 flex-col-reverse items-center justify-start gap-1 rounded-full border-2 border-[oklch(0.7_0.05_60)] bg-[oklch(0.97_0.01_85)] p-1 transition active:scale-[0.98]"
+        className="relative flex h-96 w-20 flex-col-reverse items-center justify-start gap-1.5 rounded-full border-4 border-[oklch(0.7_0.05_60)] bg-[oklch(0.97_0.01_85)] p-2 transition active:scale-[0.98]"
       >
         {Array.from({ length: count }).map((_, i) => (
           <span
             key={i}
-            className="h-8 w-8 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm"
+            className="h-12 w-12 rounded-full border border-[oklch(0.3_0.05_60)] shadow-sm"
             style={{ background: color }}
           />
         ))}
