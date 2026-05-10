@@ -117,7 +117,7 @@ function MathPage() {
           ← Home
         </Link>
         <div className="text-6xl">🔢</div>
-        <div className="grid w-full max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="grid w-full max-w-3xl grid-cols-1 gap-6 sm:grid-cols-3">
           <button
             type="button"
             onClick={() => setMode("add")}
@@ -128,6 +128,18 @@ function MathPage() {
             </div>
             <div className="text-2xl font-extrabold text-foreground">Add</div>
             <div className="text-sm text-muted-foreground">2 + 3 = ?</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMode("sub")}
+            className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+          >
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.85_0.18_30)] text-6xl shadow-lg group-hover:rotate-6 transition">
+              ➖
+            </div>
+            <div className="text-2xl font-extrabold text-foreground">Subtract</div>
+            <div className="text-sm text-muted-foreground">5 − 2 = ?</div>
           </button>
 
           <button
