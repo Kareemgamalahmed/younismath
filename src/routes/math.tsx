@@ -297,7 +297,7 @@ function MathPage() {
         </div>
       )}
 
-      {mode === "add" && <Abacus resetKey={`${a}-${b}-${total}`} />}
+      {(mode === "add" || mode === "sub") && <Abacus resetKey={`${a}-${b}-${total}`} />}
     </div>
   );
 }
