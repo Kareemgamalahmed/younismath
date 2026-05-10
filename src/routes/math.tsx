@@ -32,6 +32,11 @@ function MathPage() {
     if (m === "add") {
       setA(rand(10));
       setB(rand(10));
+    } else if (m === "sub") {
+      const x = rand(10);
+      const y = rand(10);
+      setA(Math.max(x, y));
+      setB(Math.min(x, y));
     } else if (m === "compare") {
       setA(rand(100));
       setB(rand(100));
