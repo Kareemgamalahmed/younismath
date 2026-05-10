@@ -9,7 +9,7 @@ export const Route = createFileRoute("/math")({
 });
 
 type Status = "idle" | "correct" | "wrong";
-type Mode = "menu" | "add" | "compare";
+type Mode = "menu" | "add" | "sub" | "compare";
 
 function rand(max: number) {
   return Math.floor(Math.random() * (max + 1));
@@ -32,6 +32,11 @@ function MathPage() {
     if (m === "add") {
       setA(rand(10));
       setB(rand(10));
+    } else if (m === "sub") {
+      const x = rand(10);
+      const y = rand(10);
+      setA(Math.max(x, y));
+      setB(Math.min(x, y));
     } else if (m === "compare") {
       setA(rand(100));
       setB(rand(100));
@@ -85,7 +90,8 @@ function MathPage() {
     e.preventDefault();
     const ascii = fromAny(value);
     if (ascii === "") return;
-    handleResult(Number(ascii) === a + b);
+    const expected = mode === "sub" ? a - b : a + b;
+    handleResult(Number(ascii) === expected);
   }
 
   function checkCompare(sym: ">" | "<" | "=") {
@@ -111,7 +117,7 @@ function MathPage() {
           ← Home
         </Link>
         <div className="text-6xl">🔢</div>
-        <div className="grid w-full max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="grid w-full max-w-3xl grid-cols-1 gap-6 sm:grid-cols-3">
           <button
             type="button"
             onClick={() => setMode("add")}
@@ -122,6 +128,18 @@ function MathPage() {
             </div>
             <div className="text-2xl font-extrabold text-foreground">Add</div>
             <div className="text-sm text-muted-foreground">2 + 3 = ?</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMode("sub")}
+            className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+          >
+            <div className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.85_0.18_30)] text-6xl shadow-lg group-hover:rotate-6 transition">
+              ➖
+            </div>
+            <div className="text-2xl font-extrabold text-foreground">Subtract</div>
+            <div className="text-sm text-muted-foreground">5 − 2 = ?</div>
           </button>
 
           <button
@@ -186,7 +204,7 @@ function MathPage() {
         <span className="text-sm text-muted-foreground">/ {toLang(total, lang)}</span>
       </div>
 
-      {mode === "add" ? (
+      {mode === "add" || mode === "sub" ? (
         <form
           onSubmit={checkInput}
           className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl"
@@ -196,7 +214,7 @@ function MathPage() {
             className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl"
           >
             <span>{toLang(a, lang)}</span>
-            <span className="text-primary">+</span>
+            <span className="text-primary">{mode === "sub" ? "−" : "+"}</span>
             <span>{toLang(b, lang)}</span>
             <span className="text-primary">=</span>
             <input
@@ -279,7 +297,7 @@ function MathPage() {
         </div>
       )}
 
-      {mode === "add" && <Abacus resetKey={`${a}-${b}-${total}`} />}
+      {(mode === "add" || mode === "sub") && <Abacus resetKey={`${a}-${b}-${total}`} />}
     </div>
   );
 }
