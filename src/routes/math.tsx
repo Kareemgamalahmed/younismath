@@ -90,7 +90,8 @@ function MathPage() {
     e.preventDefault();
     const ascii = fromAny(value);
     if (ascii === "") return;
-    handleResult(Number(ascii) === a + b);
+    const expected = mode === "sub" ? a - b : a + b;
+    handleResult(Number(ascii) === expected);
   }
 
   function checkCompare(sym: ">" | "<" | "=") {
