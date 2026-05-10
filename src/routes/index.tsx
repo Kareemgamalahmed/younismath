@@ -11,7 +11,7 @@ function Home() {
         🎓
       </div>
 
-      <div className="grid w-full max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
+      <div className="grid w-full max-w-3xl grid-cols-1 gap-6 sm:grid-cols-3">
         <Link
           to="/math"
           className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
