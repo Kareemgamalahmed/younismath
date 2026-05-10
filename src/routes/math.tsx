@@ -9,7 +9,7 @@ export const Route = createFileRoute("/math")({
 });
 
 type Status = "idle" | "correct" | "wrong";
-type Mode = "menu" | "add" | "compare";
+type Mode = "menu" | "add" | "sub" | "compare";
 
 function rand(max: number) {
   return Math.floor(Math.random() * (max + 1));
