@@ -204,7 +204,7 @@ function MathPage() {
         <span className="text-sm text-muted-foreground">/ {toLang(total, lang)}</span>
       </div>
 
-      {mode === "add" ? (
+      {mode === "add" || mode === "sub" ? (
         <form
           onSubmit={checkInput}
           className="flex w-full max-w-md flex-col items-center gap-6 rounded-3xl bg-card p-8 shadow-2xl"
@@ -214,7 +214,7 @@ function MathPage() {
             className="flex flex-wrap items-center justify-center gap-3 text-5xl font-extrabold text-foreground sm:text-7xl"
           >
             <span>{toLang(a, lang)}</span>
-            <span className="text-primary">+</span>
+            <span className="text-primary">{mode === "sub" ? "−" : "+"}</span>
             <span>{toLang(b, lang)}</span>
             <span className="text-primary">=</span>
             <input
