@@ -76,18 +76,19 @@ function ArabicPage() {
     if (!rec || status === "listening" || status === "correct") return;
     setHeard("");
     setStatus("listening");
+    gotResultRef.current = false;
+    shouldListenRef.current = true;
 
     const target = normalize(word);
 
-    rec.onresult = (ev: any) => {
-      const alts: string[] = [];
-      const res = ev.results[0];
-      for (let i = 0; i < res.length; i++) alts.push(res[i].transcript);
-      setHeard(alts[0] || "");
-      const ok = alts.some((a) => {
-        const n = normalize(a);
-        return n === target || n.includes(target) || target.includes(n);
-      });
+    const finish = (ok: boolean | null, transcript: string) => {
+      if (gotResultRef.current) return;
+      gotResultRef.current = true;
+      shouldListenRef.current = false;
+      try { rec.stop(); } catch {}
+      if (stopTimerRef.current) { clearTimeout(stopTimerRef.current); stopTimerRef.current = null; }
+      if (ok === null) { setStatus("idle"); return; }
+      setHeard(transcript);
       setTotal((t) => t + 1);
       savedRef.current = false;
       if (ok) {
@@ -100,8 +101,38 @@ function ArabicPage() {
         setStatus("wrong");
       }
     };
-    rec.onerror = () => setStatus("idle");
+
+    rec.onresult = (ev: any) => {
+      let finalAlts: string[] | null = null;
+      let interimText = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const res = ev.results[i];
+        if (res.isFinal) {
+          finalAlts = [];
+          for (let j = 0; j < res.length; j++) finalAlts.push(res[j].transcript);
+        } else {
+          interimText += res[0].transcript;
+        }
+      }
+      if (finalAlts) {
+        const ok = finalAlts.some((a) => {
+          const n = normalize(a);
+          return n === target || n.includes(target) || target.includes(n);
+        });
+        finish(ok, finalAlts[0] || "");
+      } else if (interimText) {
+        setHeard(interimText);
+      }
+    };
+    rec.onerror = (ev: any) => {
+      if (ev?.error === "no-speech") return; // keep waiting
+      shouldListenRef.current = false;
+      finish(null, "");
+    };
     rec.onend = () => {
+      if (shouldListenRef.current && !gotResultRef.current) {
+        try { rec.start(); return; } catch {}
+      }
       setStatus((s) => (s === "listening" ? "idle" : s));
     };
     try {
@@ -109,6 +140,15 @@ function ArabicPage() {
     } catch {
       setStatus("idle");
     }
+
+    // Hard stop after 15s so it doesn't listen forever
+    stopTimerRef.current = setTimeout(() => {
+      if (!gotResultRef.current) {
+        shouldListenRef.current = false;
+        try { rec.stop(); } catch {}
+        setStatus("idle");
+      }
+    }, 15000);
   }
 
   async function saveScore() {
