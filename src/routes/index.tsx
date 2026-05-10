@@ -11,7 +11,7 @@ function Home() {
         🎓
       </div>
 
-      <div className="grid w-full max-w-2xl grid-cols-1 gap-6 sm:grid-cols-2">
+      <div className="grid w-full max-w-3xl grid-cols-1 gap-6 sm:grid-cols-3">
         <Link
           to="/math"
           className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
@@ -35,6 +35,17 @@ function Home() {
           </div>
           <div className="text-2xl font-extrabold text-foreground">عربي</div>
           <div className="text-sm text-muted-foreground">Arabic letters</div>
+        </Link>
+
+        <Link
+          to="/cashier"
+          className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+        >
+          <div className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.88_0.15_150)] text-6xl shadow-lg group-hover:rotate-6 transition">
+            🛒
+          </div>
+          <div className="text-2xl font-extrabold text-foreground">Cashier</div>
+          <div className="text-sm text-muted-foreground">Pay with coins & notes</div>
         </Link>
       </div>
 
