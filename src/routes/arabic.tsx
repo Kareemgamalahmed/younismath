@@ -55,11 +55,15 @@ function ArabicPage() {
     }
     const rec = new SR();
     rec.lang = "ar-SA";
-    rec.interimResults = false;
+    rec.interimResults = true;
     rec.maxAlternatives = 5;
-    rec.continuous = false;
+    rec.continuous = true;
     recRef.current = rec;
   }, []);
+
+  const gotResultRef = useRef(false);
+  const shouldListenRef = useRef(false);
+  const stopTimerRef = useRef<any>(null);
 
   function next() {
     setIndex((i) => (i + 1) % WORDS.length);
