@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as MathRouteImport } from './routes/math'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as CashierRouteImport } from './routes/cashier'
 import { Route as ArabicRouteImport } from './routes/arabic'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -22,6 +23,11 @@ const MathRoute = MathRouteImport.update({
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CashierRoute = CashierRouteImport.update({
+  id: '/cashier',
+  path: '/cashier',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ArabicRoute = ArabicRouteImport.update({
@@ -38,12 +44,14 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/arabic': typeof ArabicRoute
+  '/cashier': typeof CashierRoute
   '/history': typeof HistoryRoute
   '/math': typeof MathRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/arabic': typeof ArabicRoute
+  '/cashier': typeof CashierRoute
   '/history': typeof HistoryRoute
   '/math': typeof MathRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/arabic': typeof ArabicRoute
+  '/cashier': typeof CashierRoute
   '/history': typeof HistoryRoute
   '/math': typeof MathRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/arabic' | '/history' | '/math'
+  fullPaths: '/' | '/arabic' | '/cashier' | '/history' | '/math'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/arabic' | '/history' | '/math'
-  id: '__root__' | '/' | '/arabic' | '/history' | '/math'
+  to: '/' | '/arabic' | '/cashier' | '/history' | '/math'
+  id: '__root__' | '/' | '/arabic' | '/cashier' | '/history' | '/math'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArabicRoute: typeof ArabicRoute
+  CashierRoute: typeof CashierRoute
   HistoryRoute: typeof HistoryRoute
   MathRoute: typeof MathRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cashier': {
+      id: '/cashier'
+      path: '/cashier'
+      fullPath: '/cashier'
+      preLoaderRoute: typeof CashierRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/arabic': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArabicRoute: ArabicRoute,
+  CashierRoute: CashierRoute,
   HistoryRoute: HistoryRoute,
   MathRoute: MathRoute,
 }
