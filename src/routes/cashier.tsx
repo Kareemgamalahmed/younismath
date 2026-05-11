@@ -50,8 +50,8 @@ function moneyStyle(c: number) {
   }
 }
 
-function newCart(maxItems: number) {
-  const min = 2;
+function newCart(minItems: number, maxItems: number) {
+  const min = Math.max(1, Math.min(minItems, maxItems));
   const upper = Math.max(min, maxItems);
   const n = min + Math.floor(Math.random() * (upper - min + 1));
   const cart: { product: Product; price: number }[] = [];
