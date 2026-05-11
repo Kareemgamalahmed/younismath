@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Wallet, HandCoins, Calculator, X } from "lucide-react";
+import { Wallet, HandCoins, Calculator, X, ShoppingCart, Receipt, Coins } from "lucide-react";
 import { Fireworks } from "@/components/Fireworks";
 import { fromAny, toLang, type Lang } from "@/lib/kid";
 
@@ -50,8 +50,8 @@ function moneyStyle(c: number) {
   }
 }
 
-function newCart(maxItems: number) {
-  const min = 2;
+function newCart(minItems: number, maxItems: number) {
+  const min = Math.max(1, Math.min(minItems, maxItems));
   const upper = Math.max(min, maxItems);
   const n = min + Math.floor(Math.random() * (upper - min + 1));
   const cart: { product: Product; price: number }[] = [];
@@ -162,6 +162,7 @@ function AbacusWidget({ onClose }: { onClose: () => void }) {
 
 function CashierPage() {
   const [lang, setLang] = useState<Lang>("en");
+  const [minItems, setMinItems] = useState(2);
   const [maxItems, setMaxItems] = useState(5);
   const [cart, setCart] = useState<{ product: Product; price: number }[]>([]);
   const [paid, setPaid] = useState<number[]>([]);
@@ -173,7 +174,7 @@ function CashierPage() {
   const tadaPlayed = useRef(false);
 
   useEffect(() => {
-    setCart(newCart(maxItems));
+    setCart(newCart(minItems, maxItems));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -214,7 +215,7 @@ function CashierPage() {
   function next() {
     if (allCorrect) setScore((s) => ({ correct: s.correct + 1, total: s.total + 1 }));
     else setScore((s) => ({ ...s, total: s.total + 1 }));
-    setCart(newCart(maxItems));
+    setCart(newCart(minItems, maxItems));
     setPaid([]);
     setTotalInput("");
     setChangeInput("");
@@ -283,13 +284,31 @@ function CashierPage() {
             </button>
           </div>
           <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+            Min items:
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={minItems}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(12, Number(e.target.value) || 1));
+                setMinItems(v);
+                if (v > maxItems) setMaxItems(v);
+              }}
+              className="w-16 rounded-lg border-2 border-orange-300 px-2 py-1 text-center font-extrabold"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
             Max items:
             <input
               type="number"
-              min={2}
+              min={1}
               max={12}
               value={maxItems}
-              onChange={(e) => setMaxItems(Math.max(2, Math.min(12, Number(e.target.value) || 2)))}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(12, Number(e.target.value) || 1));
+                setMaxItems(Math.max(v, minItems));
+              }}
               className="w-16 rounded-lg border-2 border-orange-300 px-2 py-1 text-center font-extrabold"
             />
           </label>
@@ -301,9 +320,11 @@ function CashierPage() {
           </button>
         </div>
 
-        {/* Cart */}
+        {/* 2. Cart - what to pay for */}
         <div className="rounded-3xl bg-white p-5 shadow-xl">
-          <h2 className="mb-3 text-lg font-bold text-gray-700">🛒 Shopping cart</h2>
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-gray-700">
+            <ShoppingCart className="h-6 w-6 text-orange-600" /> Shopping cart
+          </h2>
           <div className="flex flex-wrap gap-3">
             {cart.map((item, i) => (
               <div
@@ -320,48 +341,31 @@ function CashierPage() {
           </div>
         </div>
 
-        {/* Total + Change inputs (icons instead of labels) */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-3xl bg-white p-5 shadow-xl">
-            <div className="mb-2 flex items-center justify-center gap-2 text-emerald-700">
-              <Wallet className="h-7 w-7" />
-              <span className="text-2xl">=</span>
-              <span className="text-xl font-bold">€</span>
-            </div>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={totalInput}
-              onChange={(e) => setTotalInput(e.target.value)}
-              placeholder="?"
-              className={`w-full rounded-2xl border-4 px-4 py-3 text-center text-3xl font-extrabold outline-none transition ${inputCls(totalState)}`}
-            />
+        {/* 3. Total to pay */}
+        <div className="rounded-3xl bg-white p-5 shadow-xl">
+          <div className="mb-2 flex items-center justify-center gap-2 text-emerald-700">
+            <Receipt className="h-8 w-8" />
+            <span className="text-lg font-bold">Total to pay</span>
+            <span className="text-2xl">=</span>
+            <span className="text-xl font-bold">€</span>
           </div>
-
-          <div className="rounded-3xl bg-white p-5 shadow-xl">
-            <div className="mb-2 flex items-center justify-center gap-2 text-blue-700">
-              <HandCoins className="h-7 w-7" />
-              <span className="text-2xl">=</span>
-              <span className="text-xl font-bold">€</span>
-            </div>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={changeInput}
-              onChange={(e) => setChangeInput(e.target.value)}
-              placeholder="?"
-              className={`w-full rounded-2xl border-4 px-4 py-3 text-center text-3xl font-extrabold outline-none transition ${inputCls(changeState)}`}
-            />
-          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={totalInput}
+            onChange={(e) => setTotalInput(e.target.value)}
+            placeholder="?"
+            className={`w-full rounded-2xl border-4 px-4 py-3 text-center text-3xl font-extrabold outline-none transition ${inputCls(totalState)}`}
+          />
         </div>
 
-        {/* You Paid section — money picker is here */}
+        {/* 4. Customer paid */}
         <div className="rounded-3xl bg-white p-5 shadow-xl">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-lg font-bold text-gray-700">
-              <Wallet className="h-5 w-5" /> You paid
+              <Wallet className="h-6 w-6 text-blue-600" /> Customer paid
             </h2>
-            <span className="text-xl font-extrabold text-emerald-700">
+            <span className="text-xl font-extrabold text-blue-700">
               {toLang(paidTotal, lang)} €
             </span>
           </div>
@@ -385,7 +389,6 @@ function CashierPage() {
             })}
           </div>
 
-          {/* Money picker (moved here) */}
           <div className="mt-4 flex flex-wrap gap-3 border-t-2 border-dashed border-gray-200 pt-4">
             {MONEY.map((c) => {
               const s = moneyStyle(c);
@@ -400,6 +403,25 @@ function CashierPage() {
               );
             })}
           </div>
+        </div>
+
+        {/* 5. Change to return */}
+        <div className="rounded-3xl bg-white p-5 shadow-xl">
+          <div className="mb-2 flex items-center justify-center gap-2 text-purple-700">
+            <HandCoins className="h-8 w-8" />
+            <Coins className="h-6 w-6" />
+            <span className="text-lg font-bold">Change to return</span>
+            <span className="text-2xl">=</span>
+            <span className="text-xl font-bold">€</span>
+          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={changeInput}
+            onChange={(e) => setChangeInput(e.target.value)}
+            placeholder="?"
+            className={`w-full rounded-2xl border-4 px-4 py-3 text-center text-3xl font-extrabold outline-none transition ${inputCls(changeState)}`}
+          />
 
           {allCorrect && (
             <div className="mt-4 rounded-xl bg-emerald-100 p-3 text-center text-lg font-bold text-emerald-800">
