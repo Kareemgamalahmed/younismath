@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Wallet, HandCoins, Calculator, X } from "lucide-react";
+import { Wallet, HandCoins, Calculator, X, ShoppingCart, Receipt, Coins } from "lucide-react";
 import { Fireworks } from "@/components/Fireworks";
 import { fromAny, toLang, type Lang } from "@/lib/kid";
 
