@@ -162,6 +162,7 @@ function AbacusWidget({ onClose }: { onClose: () => void }) {
 
 function CashierPage() {
   const [lang, setLang] = useState<Lang>("en");
+  const [minItems, setMinItems] = useState(2);
   const [maxItems, setMaxItems] = useState(5);
   const [cart, setCart] = useState<{ product: Product; price: number }[]>([]);
   const [paid, setPaid] = useState<number[]>([]);
