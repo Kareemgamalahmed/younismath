@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Wallet, HandCoins, Calculator, X } from "lucide-react";
+import { Fireworks } from "@/components/Fireworks";
 import { fromAny, toLang, type Lang } from "@/lib/kid";
 
 export const Route = createFileRoute("/cashier")({
@@ -23,26 +25,139 @@ const PRODUCTS: Product[] = [
   { name: "Water", emoji: "💧" },
 ];
 
-// Whole-euro notes/coins available to pay with
-const MONEY = [1, 2, 5, 10, 20, 50, 100];
+const MONEY = [1, 2, 5, 10, 20, 50, 100, 200];
 
-function moneyColor(c: number) {
-  if (c <= 2) return "bg-amber-200 text-amber-900 border-amber-400";
-  if (c <= 10) return "bg-yellow-300 text-yellow-900 border-yellow-500";
-  if (c <= 20) return "bg-emerald-200 text-emerald-900 border-emerald-500";
-  return "bg-sky-200 text-sky-900 border-sky-500";
+// Color-coded per spec
+function moneyStyle(c: number) {
+  switch (c) {
+    case 1:
+    case 2:
+      return { cls: "bg-yellow-300 text-yellow-900 border-yellow-500", shape: "rounded-full" };
+    case 5:
+      return { cls: "bg-emerald-200 text-emerald-900 border-emerald-500", shape: "rounded-md" };
+    case 10:
+      return { cls: "bg-red-400 text-white border-red-600", shape: "rounded-md" };
+    case 20:
+      return { cls: "bg-blue-400 text-white border-blue-600", shape: "rounded-md" };
+    case 50:
+      return { cls: "bg-orange-400 text-white border-orange-600", shape: "rounded-md" };
+    case 100:
+      return { cls: "bg-green-500 text-white border-green-700", shape: "rounded-md" };
+    case 200:
+      return { cls: "bg-yellow-400 text-yellow-900 border-yellow-600", shape: "rounded-md" };
+    default:
+      return { cls: "bg-gray-200 text-gray-800 border-gray-400", shape: "rounded-md" };
+  }
 }
 
 function newCart(maxItems: number) {
-  const n = Math.max(1, 1 + Math.floor(Math.random() * maxItems));
+  const min = 2;
+  const upper = Math.max(min, maxItems);
+  const n = min + Math.floor(Math.random() * (upper - min + 1));
   const cart: { product: Product; price: number }[] = [];
   const pool = [...PRODUCTS].sort(() => Math.random() - 0.5);
   for (let i = 0; i < n; i++) {
     const p = pool[i % pool.length];
-    const price = 1 + Math.floor(Math.random() * 10); // 1..10 €
+    const price = 1 + Math.floor(Math.random() * 10);
     cart.push({ product: p, price });
   }
   return cart;
+}
+
+// Tada sound via WebAudio (no asset needed)
+function playTada() {
+  try {
+    const AC =
+      (window.AudioContext as typeof AudioContext) ||
+      ((window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+    const ctx = new AC();
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C E G C
+    notes.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "triangle";
+      o.frequency.value = f;
+      o.connect(g);
+      g.connect(ctx.destination);
+      const t0 = ctx.currentTime + i * 0.12;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.3, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.45);
+      o.start(t0);
+      o.stop(t0 + 0.5);
+    });
+    setTimeout(() => ctx.close(), 1200);
+  } catch {
+    /* ignore */
+  }
+}
+
+function AbacusWidget({ onClose }: { onClose: () => void }) {
+  const rows = 10;
+  const cols = 10;
+  const colors = [
+    "bg-red-500",
+    "bg-orange-500",
+    "bg-amber-400",
+    "bg-yellow-400",
+    "bg-lime-500",
+    "bg-green-500",
+    "bg-teal-500",
+    "bg-sky-500",
+    "bg-indigo-500",
+    "bg-purple-500",
+  ];
+  const [active, setActive] = useState<boolean[][]>(() =>
+    Array.from({ length: rows }, () => Array(cols).fill(false)),
+  );
+  function toggle(r: number, c: number) {
+    setActive((prev) => {
+      const next = prev.map((row) => [...row]);
+      // Push beads to the left up to and including clicked column
+      const willActivate = !next[r][c];
+      for (let i = 0; i < cols; i++) {
+        next[r][i] = willActivate ? i <= c : i < c;
+      }
+      return next;
+    });
+  }
+  const total = active.flat().filter(Boolean).length;
+  return (
+    <div className="fixed right-4 top-20 z-40 w-[340px] rounded-2xl border-4 border-amber-700 bg-amber-50 p-3 shadow-2xl">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="font-extrabold text-amber-900">🧮 Abacus · {total}</div>
+        <button
+          onClick={onClose}
+          className="rounded-full bg-white p-1 text-gray-600 shadow hover:bg-gray-100"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="space-y-1 rounded-xl bg-amber-900/90 p-2">
+        {active.map((row, r) => (
+          <div key={r} className="flex items-center gap-1">
+            {row.map((on, c) => (
+              <button
+                key={c}
+                onClick={() => toggle(r, c)}
+                className={`h-6 w-6 rounded-full border border-amber-200 transition ${
+                  on ? colors[r] : "bg-amber-700/40"
+                }`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={() =>
+          setActive(Array.from({ length: rows }, () => Array(cols).fill(false)))
+        }
+        className="mt-2 w-full rounded-lg bg-amber-700 py-1 text-xs font-bold text-white hover:bg-amber-800"
+      >
+        Reset
+      </button>
+    </div>
+  );
 }
 
 function CashierPage() {
@@ -52,8 +167,10 @@ function CashierPage() {
   const [paid, setPaid] = useState<number[]>([]);
   const [totalInput, setTotalInput] = useState("");
   const [changeInput, setChangeInput] = useState("");
-  const [checked, setChecked] = useState(false);
   const [score, setScore] = useState({ correct: 0, total: 0 });
+  const [showFw, setShowFw] = useState(false);
+  const [showAbacus, setShowAbacus] = useState(false);
+  const tadaPlayed = useRef(false);
 
   useEffect(() => {
     setCart(newCart(maxItems));
@@ -64,10 +181,29 @@ function CashierPage() {
   const paidTotal = paid.reduce((s, c) => s + c, 0);
   const expectedChange = Math.max(0, paidTotal - total);
 
-  const userTotal = Number(fromAny(totalInput));
-  const userChange = Number(fromAny(changeInput));
-  const totalOk = checked && totalInput !== "" && userTotal === total;
-  const changeOk = checked && changeInput !== "" && userChange === expectedChange;
+  const userTotal = totalInput === "" ? null : Number(fromAny(totalInput));
+  const userChange = changeInput === "" ? null : Number(fromAny(changeInput));
+
+  const totalState: "empty" | "ok" | "bad" =
+    totalInput === "" ? "empty" : userTotal === total ? "ok" : "bad";
+  const changeState: "empty" | "ok" | "bad" =
+    changeInput === ""
+      ? "empty"
+      : paid.length > 0 && userChange === expectedChange
+        ? "ok"
+        : "bad";
+
+  const allCorrect =
+    totalState === "ok" && changeState === "ok" && paidTotal >= total;
+
+  useEffect(() => {
+    if (allCorrect && !tadaPlayed.current) {
+      tadaPlayed.current = true;
+      playTada();
+      setShowFw(true);
+      setTimeout(() => setShowFw(false), 1300);
+    }
+  }, [allCorrect]);
 
   function addMoney(c: number) {
     setPaid((p) => [...p, c]);
@@ -75,31 +211,28 @@ function CashierPage() {
   function removeMoney(i: number) {
     setPaid((p) => p.filter((_, idx) => idx !== i));
   }
-  function check() {
-    setChecked(true);
-    const ok =
-      totalInput !== "" &&
-      changeInput !== "" &&
-      userTotal === total &&
-      userChange === expectedChange &&
-      paidTotal >= total;
-    if (ok) setScore((s) => ({ correct: s.correct + 1, total: s.total + 1 }));
-  }
   function next() {
-    if (checked && !(totalOk && changeOk)) {
-      setScore((s) => ({ ...s, total: s.total + 1 }));
-    }
+    if (allCorrect) setScore((s) => ({ correct: s.correct + 1, total: s.total + 1 }));
+    else setScore((s) => ({ ...s, total: s.total + 1 }));
     setCart(newCart(maxItems));
     setPaid([]);
     setTotalInput("");
     setChangeInput("");
-    setChecked(false);
+    tadaPlayed.current = false;
   }
 
-  const allCorrect = totalOk && changeOk && paidTotal >= total;
+  const inputCls = (st: "empty" | "ok" | "bad") =>
+    st === "ok"
+      ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+      : st === "bad"
+        ? "border-red-500 bg-red-50 text-red-700"
+        : "border-orange-300 bg-white text-gray-800";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-100 px-4 py-6">
+      {showFw && <Fireworks />}
+      {showAbacus && <AbacusWidget onClose={() => setShowAbacus(false)} />}
+
       <div className="mx-auto flex max-w-5xl flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
@@ -111,8 +244,19 @@ function CashierPage() {
           <h1 className="text-2xl font-extrabold text-orange-900 sm:text-3xl">
             🛒 Little Cashier
           </h1>
-          <div className="rounded-full bg-white px-4 py-2 text-sm font-bold shadow">
-            ⭐ {toLang(score.correct, lang)}/{toLang(score.total, lang)}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAbacus((v) => !v)}
+              className={`flex items-center gap-1 rounded-full px-3 py-2 text-sm font-bold shadow ${
+                showAbacus ? "bg-amber-600 text-white" : "bg-white text-amber-800"
+              }`}
+              title="Abacus"
+            >
+              <Calculator className="h-4 w-4" /> 🧮
+            </button>
+            <div className="rounded-full bg-white px-4 py-2 text-sm font-bold shadow">
+              ⭐ {toLang(score.correct, lang)}/{toLang(score.total, lang)}
+            </div>
           </div>
         </div>
 
@@ -142,10 +286,10 @@ function CashierPage() {
             Max items:
             <input
               type="number"
-              min={1}
+              min={2}
               max={12}
               value={maxItems}
-              onChange={(e) => setMaxItems(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+              onChange={(e) => setMaxItems(Math.max(2, Math.min(12, Number(e.target.value) || 2)))}
               className="w-16 rounded-lg border-2 border-orange-300 px-2 py-1 text-center font-extrabold"
             />
           </label>
@@ -159,7 +303,7 @@ function CashierPage() {
 
         {/* Cart */}
         <div className="rounded-3xl bg-white p-5 shadow-xl">
-          <h2 className="mb-3 text-lg font-bold text-gray-700">Shopping cart</h2>
+          <h2 className="mb-3 text-lg font-bold text-gray-700">🛒 Shopping cart</h2>
           <div className="flex flex-wrap gap-3">
             {cart.map((item, i) => (
               <div
@@ -176,120 +320,100 @@ function CashierPage() {
           </div>
         </div>
 
-        {/* Your answers */}
+        {/* Total + Change inputs (icons instead of labels) */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-3xl bg-white p-5 shadow-xl">
-            <label className="mb-2 block text-lg font-bold text-gray-700">Total to pay (€)</label>
+            <div className="mb-2 flex items-center justify-center gap-2 text-emerald-700">
+              <Wallet className="h-7 w-7" />
+              <span className="text-2xl">=</span>
+              <span className="text-xl font-bold">€</span>
+            </div>
             <input
               type="text"
               inputMode="numeric"
               value={totalInput}
-              onChange={(e) => {
-                setTotalInput(e.target.value);
-                setChecked(false);
-              }}
+              onChange={(e) => setTotalInput(e.target.value)}
               placeholder="?"
-              className={`w-full rounded-2xl border-4 px-4 py-3 text-center text-3xl font-extrabold outline-none transition ${
-                checked
-                  ? totalOk
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-800"
-                    : "border-red-500 bg-red-50 text-red-700"
-                  : "border-orange-300 bg-white text-gray-800"
-              }`}
+              className={`w-full rounded-2xl border-4 px-4 py-3 text-center text-3xl font-extrabold outline-none transition ${inputCls(totalState)}`}
             />
-            {checked && !totalOk && (
-              <div className="mt-2 text-center text-sm font-bold text-red-600">
-                Correct: {toLang(total, lang)} €
-              </div>
-            )}
           </div>
 
           <div className="rounded-3xl bg-white p-5 shadow-xl">
-            <label className="mb-2 block text-lg font-bold text-gray-700">
-              Change to give back (€)
-            </label>
+            <div className="mb-2 flex items-center justify-center gap-2 text-blue-700">
+              <HandCoins className="h-7 w-7" />
+              <span className="text-2xl">=</span>
+              <span className="text-xl font-bold">€</span>
+            </div>
             <input
               type="text"
               inputMode="numeric"
               value={changeInput}
-              onChange={(e) => {
-                setChangeInput(e.target.value);
-                setChecked(false);
-              }}
+              onChange={(e) => setChangeInput(e.target.value)}
               placeholder="?"
-              className={`w-full rounded-2xl border-4 px-4 py-3 text-center text-3xl font-extrabold outline-none transition ${
-                checked
-                  ? changeOk
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-800"
-                    : "border-red-500 bg-red-50 text-red-700"
-                  : "border-orange-300 bg-white text-gray-800"
-              }`}
+              className={`w-full rounded-2xl border-4 px-4 py-3 text-center text-3xl font-extrabold outline-none transition ${inputCls(changeState)}`}
             />
-            {checked && !changeOk && (
-              <div className="mt-2 text-center text-sm font-bold text-red-600">
-                Correct: {toLang(expectedChange, lang)} €
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Paid */}
+        {/* You Paid section — money picker is here */}
         <div className="rounded-3xl bg-white p-5 shadow-xl">
-          <h2 className="mb-3 text-lg font-bold text-gray-700">You paid</h2>
-          <div className="flex min-h-[70px] flex-wrap gap-2 rounded-2xl bg-gray-50 p-3">
-            {paid.length === 0 && (
-              <span className="text-sm text-gray-400">Tap notes below to pay…</span>
-            )}
-            {paid.map((c, i) => (
-              <button
-                key={i}
-                onClick={() => removeMoney(i)}
-                className={`flex h-12 w-14 items-center justify-center rounded-xl border-2 text-sm font-extrabold shadow ${moneyColor(
-                  c,
-                )}`}
-                title="Tap to remove"
-              >
-                {toLang(c, lang)}€
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-sm font-bold text-gray-600">Paid total</span>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-gray-700">
+              <Wallet className="h-5 w-5" /> You paid
+            </h2>
             <span className="text-xl font-extrabold text-emerald-700">
               {toLang(paidTotal, lang)} €
             </span>
           </div>
 
-          {checked && (
-            <div
-              className={`mt-3 rounded-xl p-3 text-center text-lg font-bold ${
-                allCorrect ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
-              }`}
-            >
-              {allCorrect
-                ? "🎉 Perfect! Total and change are correct!"
-                : paidTotal < total
-                  ? `❌ Not enough paid — need ${toLang(total - paidTotal, lang)} € more`
-                  : "❌ Check your numbers in red"}
+          <div className="flex min-h-[70px] flex-wrap gap-2 rounded-2xl bg-gray-50 p-3">
+            {paid.length === 0 && (
+              <span className="text-sm text-gray-400">Tap money below to pay…</span>
+            )}
+            {paid.map((c, i) => {
+              const s = moneyStyle(c);
+              return (
+                <button
+                  key={i}
+                  onClick={() => removeMoney(i)}
+                  className={`flex h-12 w-14 items-center justify-center border-2 text-sm font-extrabold shadow ${s.cls} ${s.shape}`}
+                  title="Tap to remove"
+                >
+                  {toLang(c, lang)}€
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Money picker (moved here) */}
+          <div className="mt-4 flex flex-wrap gap-3 border-t-2 border-dashed border-gray-200 pt-4">
+            {MONEY.map((c) => {
+              const s = moneyStyle(c);
+              return (
+                <button
+                  key={c}
+                  onClick={() => addMoney(c)}
+                  className={`flex h-16 w-20 items-center justify-center border-4 text-base font-extrabold shadow-lg transition active:scale-90 ${s.cls} ${s.shape}`}
+                >
+                  {toLang(c, lang)}€
+                </button>
+              );
+            })}
+          </div>
+
+          {allCorrect && (
+            <div className="mt-4 rounded-xl bg-emerald-100 p-3 text-center text-lg font-bold text-emerald-800">
+              🎉 Tada! Perfect!
             </div>
           )}
 
           <div className="mt-4 flex gap-3">
-            {!checked || !allCorrect ? (
-              <button
-                onClick={check}
-                className="flex-1 rounded-2xl bg-emerald-500 py-3 text-lg font-extrabold text-white shadow-lg hover:bg-emerald-600"
-              >
-                ✓ Check
-              </button>
-            ) : (
-              <button
-                onClick={next}
-                className="flex-1 rounded-2xl bg-orange-500 py-3 text-lg font-extrabold text-white shadow-lg hover:bg-orange-600"
-              >
-                Next →
-              </button>
-            )}
+            <button
+              onClick={next}
+              className="flex-1 rounded-2xl bg-orange-500 py-3 text-lg font-extrabold text-white shadow-lg hover:bg-orange-600"
+            >
+              Next →
+            </button>
             <button
               onClick={() => setPaid([])}
               disabled={paid.length === 0}
@@ -297,24 +421,6 @@ function CashierPage() {
             >
               Clear
             </button>
-          </div>
-        </div>
-
-        {/* Money */}
-        <div className="rounded-3xl bg-white p-5 shadow-xl">
-          <h2 className="mb-3 text-lg font-bold text-gray-700">Money</h2>
-          <div className="flex flex-wrap gap-3">
-            {MONEY.map((c) => (
-              <button
-                key={c}
-                onClick={() => addMoney(c)}
-                className={`flex h-16 w-20 items-center justify-center rounded-xl border-4 text-base font-extrabold shadow-lg transition active:scale-90 ${moneyColor(
-                  c,
-                )}`}
-              >
-                {toLang(c, lang)}€
-              </button>
-            ))}
           </div>
         </div>
       </div>
