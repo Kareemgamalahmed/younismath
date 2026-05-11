@@ -174,7 +174,7 @@ function CashierPage() {
   const tadaPlayed = useRef(false);
 
   useEffect(() => {
-    setCart(newCart(maxItems));
+    setCart(newCart(minItems, maxItems));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -215,7 +215,7 @@ function CashierPage() {
   function next() {
     if (allCorrect) setScore((s) => ({ correct: s.correct + 1, total: s.total + 1 }));
     else setScore((s) => ({ ...s, total: s.total + 1 }));
-    setCart(newCart(maxItems));
+    setCart(newCart(minItems, maxItems));
     setPaid([]);
     setTotalInput("");
     setChangeInput("");
