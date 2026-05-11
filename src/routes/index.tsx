@@ -49,12 +49,20 @@ function Home() {
         </Link>
       </div>
 
-      <Link
-        to="/history"
-        className="rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-md hover:bg-primary/90"
-      >
-        ⭐ My History
-      </Link>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Link
+          to="/history"
+          className="rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-md hover:bg-primary/90"
+        >
+          ⭐ My History
+        </Link>
+        <Link
+          to="/parent"
+          className="rounded-full bg-white px-6 py-3 text-sm font-bold text-indigo-700 shadow-md hover:bg-gray-50"
+        >
+          👨‍👩‍👧 Parent Progress
+        </Link>
+      </div>
     </div>
   );
 }
