@@ -181,17 +181,19 @@ function CashierPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [minItems, setMinItems] = useState(2);
   const [maxItems, setMaxItems] = useState(5);
+  const [maxTotal, setMaxTotal] = useState(50);
   const [cart, setCart] = useState<{ product: Product; price: number }[]>([]);
   const [paid, setPaid] = useState<number[]>([]);
   const [totalInput, setTotalInput] = useState("");
   const [changeInput, setChangeInput] = useState("");
+  const [cmpAnswer, setCmpAnswer] = useState<"<" | ">" | "=" | null>(null);
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [showFw, setShowFw] = useState(false);
   const [showAbacus, setShowAbacus] = useState(false);
   const tadaPlayed = useRef(false);
 
   useEffect(() => {
-    setCart(newCart(minItems, maxItems));
+    setCart(newCart(minItems, maxItems, maxTotal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -210,6 +212,11 @@ function CashierPage() {
       : paid.length > 0 && userChange === expectedChange
         ? "ok"
         : "bad";
+
+  const expectedCmp: "<" | ">" | "=" =
+    paidTotal < total ? "<" : paidTotal > total ? ">" : "=";
+  const cmpState: "empty" | "ok" | "bad" =
+    cmpAnswer === null ? "empty" : cmpAnswer === expectedCmp ? "ok" : "bad";
 
   const allCorrect =
     totalState === "ok" && changeState === "ok" && paidTotal >= total;
@@ -232,10 +239,11 @@ function CashierPage() {
   function next() {
     if (allCorrect) setScore((s) => ({ correct: s.correct + 1, total: s.total + 1 }));
     else setScore((s) => ({ ...s, total: s.total + 1 }));
-    setCart(newCart(minItems, maxItems));
+    setCart(newCart(minItems, maxItems, maxTotal));
     setPaid([]);
     setTotalInput("");
     setChangeInput("");
+    setCmpAnswer(null);
     tadaPlayed.current = false;
   }
 
