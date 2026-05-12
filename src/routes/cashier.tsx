@@ -337,6 +337,20 @@ function CashierPage() {
               className="w-16 rounded-lg border-2 border-orange-300 px-2 py-1 text-center font-extrabold"
             />
           </label>
+          <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+            Max total €:
+            <input
+              type="number"
+              min={2}
+              max={500}
+              value={maxTotal}
+              onChange={(e) => {
+                const v = Math.max(2, Math.min(500, Number(e.target.value) || 2));
+                setMaxTotal(v);
+              }}
+              className="w-20 rounded-lg border-2 border-orange-300 px-2 py-1 text-center font-extrabold"
+            />
+          </label>
           <button
             onClick={next}
             className="rounded-full bg-orange-500 px-4 py-1 text-sm font-bold text-white shadow hover:bg-orange-600"
