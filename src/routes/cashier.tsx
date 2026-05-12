@@ -385,9 +385,20 @@ function CashierPage() {
           <div className="mb-2 flex items-center justify-center gap-2 text-emerald-700">
             <Receipt className="h-8 w-8" />
             <span className="text-lg font-bold">Total to pay</span>
-            <span className="text-2xl">=</span>
-            <span className="text-xl font-bold">€</span>
           </div>
+          {cart.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-2xl font-extrabold text-emerald-800">
+              {cart.map((c, i) => (
+                <span key={i} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-emerald-500">+</span>}
+                  <span>{toLang(c.price, lang)}</span>
+                </span>
+              ))}
+              <span className="text-emerald-500">=</span>
+              <span className="text-emerald-400">?</span>
+              <span className="text-base">€</span>
+            </div>
+          )}
           <input
             type="text"
             inputMode="numeric"
