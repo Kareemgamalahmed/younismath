@@ -455,15 +455,62 @@ function CashierPage() {
           </div>
         </div>
 
+        {/* 4b. Compare paid vs total - only after total is correct */}
+        {totalState === "ok" && paid.length > 0 && (
+          <div className="rounded-3xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-center gap-2 text-indigo-700">
+              <span className="text-lg font-bold">Compare</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 text-3xl font-extrabold">
+              <span className="rounded-xl bg-blue-100 px-4 py-2 text-blue-800">
+                {toLang(paidTotal, lang)} €
+              </span>
+              <div className="flex gap-2">
+                {(["<", "=", ">"] as const).map((op) => {
+                  const sel = cmpAnswer === op;
+                  const correct = sel && cmpState === "ok";
+                  const wrong = sel && cmpState === "bad";
+                  return (
+                    <button
+                      key={op}
+                      onClick={() => setCmpAnswer(op)}
+                      className={`h-14 w-14 rounded-2xl border-4 text-3xl font-extrabold shadow transition active:scale-90 ${
+                        correct
+                          ? "border-emerald-600 bg-emerald-100 text-emerald-700"
+                          : wrong
+                            ? "border-red-600 bg-red-100 text-red-700"
+                            : "border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50"
+                      }`}
+                    >
+                      {op}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="rounded-xl bg-emerald-100 px-4 py-2 text-emerald-800">
+                {toLang(total, lang)} €
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* 5. Change to return */}
         <div className="rounded-3xl bg-white p-5 shadow-xl">
           <div className="mb-2 flex items-center justify-center gap-2 text-purple-700">
             <HandCoins className="h-8 w-8" />
             <Coins className="h-6 w-6" />
             <span className="text-lg font-bold">Change to return</span>
-            <span className="text-2xl">=</span>
-            <span className="text-xl font-bold">€</span>
           </div>
+          {paid.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-purple-50 px-3 py-2 text-2xl font-extrabold text-purple-800">
+              <span>{toLang(paidTotal, lang)}</span>
+              <span className="text-purple-500">−</span>
+              <span>{toLang(total, lang)}</span>
+              <span className="text-purple-500">=</span>
+              <span className="text-purple-400">?</span>
+              <span className="text-base">€</span>
+            </div>
+          )}
           <input
             type="text"
             inputMode="numeric"
