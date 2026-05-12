@@ -50,15 +50,32 @@ function moneyStyle(c: number) {
   }
 }
 
-function newCart(minItems: number, maxItems: number) {
+function newCart(minItems: number, maxItems: number, maxTotal: number) {
   const min = Math.max(1, Math.min(minItems, maxItems));
   const upper = Math.max(min, maxItems);
   const n = min + Math.floor(Math.random() * (upper - min + 1));
-  const cart: { product: Product; price: number }[] = [];
   const pool = [...PRODUCTS].sort(() => Math.random() - 0.5);
+  // Try a few times to satisfy the max total constraint with random prices
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const cart: { product: Product; price: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      const p = pool[i % pool.length];
+      const price = 1 + Math.floor(Math.random() * 10);
+      cart.push({ product: p, price });
+    }
+    const sum = cart.reduce((s, c) => s + c.price, 0);
+    if (sum <= maxTotal) return cart;
+  }
+  // Fallback: cap each price so the sum fits
+  const cap = Math.max(1, Math.floor(maxTotal / n));
+  const cart: { product: Product; price: number }[] = [];
+  let remaining = maxTotal;
   for (let i = 0; i < n; i++) {
     const p = pool[i % pool.length];
-    const price = 1 + Math.floor(Math.random() * 10);
+    const left = n - i;
+    const maxAllowed = Math.max(1, Math.min(cap, remaining - (left - 1)));
+    const price = 1 + Math.floor(Math.random() * maxAllowed);
+    remaining -= price;
     cart.push({ product: p, price });
   }
   return cart;
@@ -164,17 +181,19 @@ function CashierPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [minItems, setMinItems] = useState(2);
   const [maxItems, setMaxItems] = useState(5);
+  const [maxTotal, setMaxTotal] = useState(50);
   const [cart, setCart] = useState<{ product: Product; price: number }[]>([]);
   const [paid, setPaid] = useState<number[]>([]);
   const [totalInput, setTotalInput] = useState("");
   const [changeInput, setChangeInput] = useState("");
+  const [cmpAnswer, setCmpAnswer] = useState<"<" | ">" | "=" | null>(null);
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [showFw, setShowFw] = useState(false);
   const [showAbacus, setShowAbacus] = useState(false);
   const tadaPlayed = useRef(false);
 
   useEffect(() => {
-    setCart(newCart(minItems, maxItems));
+    setCart(newCart(minItems, maxItems, maxTotal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -193,6 +212,11 @@ function CashierPage() {
       : paid.length > 0 && userChange === expectedChange
         ? "ok"
         : "bad";
+
+  const expectedCmp: "<" | ">" | "=" =
+    paidTotal < total ? "<" : paidTotal > total ? ">" : "=";
+  const cmpState: "empty" | "ok" | "bad" =
+    cmpAnswer === null ? "empty" : cmpAnswer === expectedCmp ? "ok" : "bad";
 
   const allCorrect =
     totalState === "ok" && changeState === "ok" && paidTotal >= total;
@@ -215,10 +239,11 @@ function CashierPage() {
   function next() {
     if (allCorrect) setScore((s) => ({ correct: s.correct + 1, total: s.total + 1 }));
     else setScore((s) => ({ ...s, total: s.total + 1 }));
-    setCart(newCart(minItems, maxItems));
+    setCart(newCart(minItems, maxItems, maxTotal));
     setPaid([]);
     setTotalInput("");
     setChangeInput("");
+    setCmpAnswer(null);
     tadaPlayed.current = false;
   }
 
@@ -312,6 +337,20 @@ function CashierPage() {
               className="w-16 rounded-lg border-2 border-orange-300 px-2 py-1 text-center font-extrabold"
             />
           </label>
+          <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+            Max total €:
+            <input
+              type="number"
+              min={2}
+              max={500}
+              value={maxTotal}
+              onChange={(e) => {
+                const v = Math.max(2, Math.min(500, Number(e.target.value) || 2));
+                setMaxTotal(v);
+              }}
+              className="w-20 rounded-lg border-2 border-orange-300 px-2 py-1 text-center font-extrabold"
+            />
+          </label>
           <button
             onClick={next}
             className="rounded-full bg-orange-500 px-4 py-1 text-sm font-bold text-white shadow hover:bg-orange-600"
@@ -346,9 +385,20 @@ function CashierPage() {
           <div className="mb-2 flex items-center justify-center gap-2 text-emerald-700">
             <Receipt className="h-8 w-8" />
             <span className="text-lg font-bold">Total to pay</span>
-            <span className="text-2xl">=</span>
-            <span className="text-xl font-bold">€</span>
           </div>
+          {cart.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-2xl font-extrabold text-emerald-800">
+              {cart.map((c, i) => (
+                <span key={i} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-emerald-500">+</span>}
+                  <span>{toLang(c.price, lang)}</span>
+                </span>
+              ))}
+              <span className="text-emerald-500">=</span>
+              <span className="text-emerald-400">?</span>
+              <span className="text-base">€</span>
+            </div>
+          )}
           <input
             type="text"
             inputMode="numeric"
@@ -405,15 +455,62 @@ function CashierPage() {
           </div>
         </div>
 
+        {/* 4b. Compare paid vs total - only after total is correct */}
+        {totalState === "ok" && paid.length > 0 && (
+          <div className="rounded-3xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-center gap-2 text-indigo-700">
+              <span className="text-lg font-bold">Compare</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 text-3xl font-extrabold">
+              <span className="rounded-xl bg-blue-100 px-4 py-2 text-blue-800">
+                {toLang(paidTotal, lang)} €
+              </span>
+              <div className="flex gap-2">
+                {(["<", "=", ">"] as const).map((op) => {
+                  const sel = cmpAnswer === op;
+                  const correct = sel && cmpState === "ok";
+                  const wrong = sel && cmpState === "bad";
+                  return (
+                    <button
+                      key={op}
+                      onClick={() => setCmpAnswer(op)}
+                      className={`h-14 w-14 rounded-2xl border-4 text-3xl font-extrabold shadow transition active:scale-90 ${
+                        correct
+                          ? "border-emerald-600 bg-emerald-100 text-emerald-700"
+                          : wrong
+                            ? "border-red-600 bg-red-100 text-red-700"
+                            : "border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50"
+                      }`}
+                    >
+                      {op}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="rounded-xl bg-emerald-100 px-4 py-2 text-emerald-800">
+                {toLang(total, lang)} €
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* 5. Change to return */}
         <div className="rounded-3xl bg-white p-5 shadow-xl">
           <div className="mb-2 flex items-center justify-center gap-2 text-purple-700">
             <HandCoins className="h-8 w-8" />
             <Coins className="h-6 w-6" />
             <span className="text-lg font-bold">Change to return</span>
-            <span className="text-2xl">=</span>
-            <span className="text-xl font-bold">€</span>
           </div>
+          {paid.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-purple-50 px-3 py-2 text-2xl font-extrabold text-purple-800">
+              <span>{toLang(paidTotal, lang)}</span>
+              <span className="text-purple-500">−</span>
+              <span>{toLang(total, lang)}</span>
+              <span className="text-purple-500">=</span>
+              <span className="text-purple-400">?</span>
+              <span className="text-base">€</span>
+            </div>
+          )}
           <input
             type="text"
             inputMode="numeric"
