@@ -50,15 +50,32 @@ function moneyStyle(c: number) {
   }
 }
 
-function newCart(minItems: number, maxItems: number) {
+function newCart(minItems: number, maxItems: number, maxTotal: number) {
   const min = Math.max(1, Math.min(minItems, maxItems));
   const upper = Math.max(min, maxItems);
   const n = min + Math.floor(Math.random() * (upper - min + 1));
-  const cart: { product: Product; price: number }[] = [];
   const pool = [...PRODUCTS].sort(() => Math.random() - 0.5);
+  // Try a few times to satisfy the max total constraint with random prices
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const cart: { product: Product; price: number }[] = [];
+    for (let i = 0; i < n; i++) {
+      const p = pool[i % pool.length];
+      const price = 1 + Math.floor(Math.random() * 10);
+      cart.push({ product: p, price });
+    }
+    const sum = cart.reduce((s, c) => s + c.price, 0);
+    if (sum <= maxTotal) return cart;
+  }
+  // Fallback: cap each price so the sum fits
+  const cap = Math.max(1, Math.floor(maxTotal / n));
+  const cart: { product: Product; price: number }[] = [];
+  let remaining = maxTotal;
   for (let i = 0; i < n; i++) {
     const p = pool[i % pool.length];
-    const price = 1 + Math.floor(Math.random() * 10);
+    const left = n - i;
+    const maxAllowed = Math.max(1, Math.min(cap, remaining - (left - 1)));
+    const price = 1 + Math.floor(Math.random() * maxAllowed);
+    remaining -= price;
     cart.push({ product: p, price });
   }
   return cart;
