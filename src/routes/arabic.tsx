@@ -31,7 +31,17 @@ function normalize(s: string): string {
     .trim();
 }
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function ArabicPage() {
+  const [words] = useState(() => shuffle(WORDS));
   const [index, setIndex] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
   const [heard, setHeard] = useState("");
@@ -42,7 +52,7 @@ function ArabicPage() {
   const recRef = useRef<any>(null);
   const savedRef = useRef(false);
 
-  const word = WORDS[index];
+  const word = words[index];
 
   useEffect(() => {
     const SR =
