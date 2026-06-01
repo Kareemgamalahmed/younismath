@@ -76,7 +76,7 @@ function ArabicPage() {
   const stopTimerRef = useRef<any>(null);
 
   function next() {
-    setIndex((i) => (i + 1) % WORDS.length);
+    setIndex((i) => (i + 1) % words.length);
     setStatus("idle");
     setHeard("");
   }
