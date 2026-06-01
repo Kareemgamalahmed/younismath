@@ -206,7 +206,7 @@ function ArabicPage() {
         <span className="text-2xl">⭐</span>
         <span className="text-2xl font-extrabold text-primary">{toLang(score, "ar")}</span>
         <span className="text-sm text-muted-foreground">
-          {toLang(index + 1, "ar")} / {toLang(WORDS.length, "ar")}
+          {toLang(index + 1, "ar")} / {toLang(words.length, "ar")}
         </span>
       </div>
 
