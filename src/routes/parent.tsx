@@ -126,7 +126,6 @@ function ParentPage() {
           <h2 className="mb-4 text-xl font-extrabold text-indigo-700">
             Math Skills · English
           </h2>
-          </h2>
           <ol className="space-y-3">
             {PHASES_EN.map((p) => (
               <li
