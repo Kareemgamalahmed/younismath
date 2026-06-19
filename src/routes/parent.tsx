@@ -1,8 +1,58 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import {
+  getSpeedFactors,
+  setSpeedFactors,
+  type SpeedLevel,
+} from "@/lib/kid";
 
 export const Route = createFileRoute("/parent")({
   component: ParentPage,
 });
+
+function RaceSpeedCard() {
+  const [factors, setF] = useState<Record<SpeedLevel, number>>({
+    green: 1.1, yellow: 1.4, orange: 1.7, red: 2.0,
+  });
+  useEffect(() => { setF(getSpeedFactors()); }, []);
+  function update(level: SpeedLevel, v: string) {
+    const num = Number(v);
+    if (!Number.isFinite(num) || num < 1) return;
+    const next = { ...factors, [level]: num };
+    setF(next);
+    setSpeedFactors(next);
+  }
+  const rows: { level: SpeedLevel; label: string; emoji: string }[] = [
+    { level: "green", label: "Green", emoji: "🟢" },
+    { level: "yellow", label: "Yellow", emoji: "🟡" },
+    { level: "orange", label: "Orange", emoji: "🟠" },
+    { level: "red", label: "Red", emoji: "🔴" },
+  ];
+  return (
+    <section className="rounded-3xl bg-white p-6 shadow-xl">
+      <h2 className="mb-1 text-xl font-extrabold text-rose-700">🏎️ Race Speed</h2>
+      <div dir="rtl" className="mb-3 text-sm font-bold text-rose-700">سرعة السباق</div>
+      <p className="mb-4 text-sm text-gray-600">
+        How much faster the race gets each minute. 1.1 = gentle, 2.0 = very fast.
+      </p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {rows.map((r) => (
+          <label key={r.level} className="flex flex-col gap-1 rounded-2xl bg-gray-50 p-3">
+            <span className="text-sm font-bold">{r.emoji} {r.label}</span>
+            <input
+              type="number"
+              min={1}
+              step={0.1}
+              value={factors[r.level]}
+              onChange={(e) => update(r.level, e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-lg font-bold"
+            />
+          </label>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 const PHASES_EN = [
   { n: 1, t: "Learning the numbers." },
