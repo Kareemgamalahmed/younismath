@@ -1,33 +1,37 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Fireworks } from "@/components/Fireworks";
 import { toLang, type Lang } from "@/lib/kid";
-import truckImg from "@/assets/truck.png";
+import { WORDS, normalizeArabic } from "@/lib/arabic";
 
 export const Route = createFileRoute("/race")({
   component: RacePage,
 });
 
-type QType = "math" | "arabic";
-type Question = {
-  type: QType;
+// --- Constants ---
+const LANES = 3;
+const ROWS = 12;
+const PLAYER_ROW = ROWS - 1;
+const START_LIVES = 5;
+const QUESTION_EVERY = 5;
+
+type MathQ = {
+  kind: "math";
   prompt: string;
   options: string[];
   answer: string;
 };
-
-const AR_LETTERS = ["أ", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي"];
-const AR_NAMES: Record<string, string> = {
-  "أ": "alif", "ب": "ba", "ت": "ta", "ث": "tha", "ج": "jeem", "ح": "haa", "خ": "kha",
-  "د": "dal", "ذ": "thal", "ر": "ra", "ز": "zay", "س": "seen", "ش": "sheen", "ص": "saad",
-  "ض": "daad", "ط": "taa", "ظ": "zaa", "ع": "ayn", "غ": "ghayn", "ف": "fa", "ق": "qaf",
-  "ك": "kaf", "ل": "lam", "م": "meem", "ن": "noon", "ه": "ha", "و": "waw", "ي": "ya",
+type ArabicQ = {
+  kind: "arabic";
+  word: string;
 };
+type Question = MathQ | ArabicQ;
 
-function rand(n: number) { return Math.floor(Math.random() * n); }
-function pick<T>(a: T[]): T { return a[rand(a.length)]; }
+function rand(n: number) {
+  return Math.floor(Math.random() * n);
+}
 
-function makeMath(lang: Lang): Question {
+function makeMath(lang: Lang): MathQ {
   const a = 1 + rand(9);
   const b = 1 + rand(9);
   const op = Math.random() < 0.5 ? "+" : "-";
@@ -37,31 +41,18 @@ function makeMath(lang: Lang): Question {
   while (opts.size < 4) opts.add(Math.max(0, ans + rand(7) - 3));
   const arr = [...opts].sort(() => Math.random() - 0.5);
   return {
-    type: "math",
+    kind: "math",
     prompt: `${toLang(x, lang)} ${op} ${toLang(y, lang)} = ?`,
     options: arr.map((n) => toLang(n, lang)),
     answer: toLang(ans, lang),
   };
 }
 
-function makeArabic(): Question {
-  const letter = pick(AR_LETTERS);
-  const correct = AR_NAMES[letter];
-  const opts = new Set<string>([correct]);
-  while (opts.size < 4) opts.add(AR_NAMES[pick(AR_LETTERS)]);
-  return {
-    type: "arabic",
-    prompt: letter,
-    options: [...opts].sort(() => Math.random() - 0.5),
-    answer: correct,
-  };
+function makeArabic(): ArabicQ {
+  return { kind: "arabic", word: WORDS[rand(WORDS.length)] };
 }
 
-function makeQuestion(lang: Lang): Question {
-  return Math.random() < 0.5 ? makeMath(lang) : makeArabic();
-}
-
-// Sound effects via WebAudio
+// --- Sounds ---
 function playCheer() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -90,124 +81,205 @@ function playBuzz() {
     g.gain.setValueAtTime(0.2, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
     o.connect(g).connect(ctx.destination);
-    o.start(); o.stop(ctx.currentTime + 0.3);
+    o.start();
+    o.stop(ctx.currentTime + 0.3);
   } catch {}
 }
 
-// 3 stops along the track at progress percentages
-const STOPS = [0.25, 0.55, 0.85];
+// Obstacle: lane (0..2) and row (0..ROWS-1). Lives at index in array.
+type Obstacle = { id: number; lane: number; row: number };
 
 function RacePage() {
   const [lang, setLang] = useState<Lang>("en");
-  const [progress, setProgress] = useState(0); // 0..1
-  const [stopIdx, setStopIdx] = useState(0); // next stop index 0..2
+  const [playerLane, setPlayerLane] = useState(1);
+  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+  const [score, setScore] = useState(0);
+  const [dodged, setDodged] = useState(0);
+  const [lives, setLives] = useState(START_LIVES);
   const [question, setQuestion] = useState<Question | null>(null);
-  const [feedback, setFeedback] = useState<"ok" | "bad" | null>(null);
+  const [crashFlash, setCrashFlash] = useState(false);
   const [showFw, setShowFw] = useState(false);
-  const [finished, setFinished] = useState(false);
-  const [moving, setMoving] = useState(false);
-  const moveDir = useRef(0); // -1, 0, +1
-  const rafRef = useRef<number | null>(null);
+  const [gameOver, setGameOver] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
 
-  // Generate stop questions once (regen on reset)
-  const [stopQs, setStopQs] = useState<Question[]>(() => STOPS.map(() => makeQuestion(lang)));
+  const playerLaneRef = useRef(playerLane);
+  const obstaclesRef = useRef<Obstacle[]>([]);
+  const dodgedRef = useRef(0);
+  const pausedRef = useRef(false);
+  const overRef = useRef(false);
+  const tickRef = useRef<any>(null);
+  const nextIdRef = useRef(1);
+  const sinceSpawnRef = useRef(0);
 
-  // movement loop
+  useEffect(() => { playerLaneRef.current = playerLane; }, [playerLane]);
+  useEffect(() => { obstaclesRef.current = obstacles; }, [obstacles]);
+  useEffect(() => { dodgedRef.current = dodged; }, [dodged]);
+  useEffect(() => { pausedRef.current = !!question || gameOver; }, [question, gameOver]);
+  useEffect(() => { overRef.current = gameOver; }, [gameOver]);
+
+  // Detect speech recognition support
   useEffect(() => {
-    let last = performance.now();
-    const tick = (t: number) => {
-      const dt = (t - last) / 1000;
-      last = t;
-      if (!question && !finished && moveDir.current !== 0) {
-        setProgress((p) => {
-          let np = p + moveDir.current * dt * 0.12;
-          np = Math.max(0, Math.min(1, np));
-          // check stop trigger when going forward
-          if (moveDir.current > 0 && stopIdx < STOPS.length && np >= STOPS[stopIdx]) {
-            np = STOPS[stopIdx];
-            setQuestion(stopQs[stopIdx]);
-            moveDir.current = 0;
-            setMoving(false);
+    const SR =
+      (typeof window !== "undefined" &&
+        ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) ||
+      null;
+    setSpeechSupported(!!SR);
+  }, []);
+
+  // Tick interval — speed up as score grows
+  const tickMs = Math.max(220, 520 - score * 12);
+
+  const loseLife = useCallback(() => {
+    setLives((l) => {
+      const nl = l - 1;
+      if (nl <= 0) {
+        setGameOver(true);
+        overRef.current = true;
+      }
+      return Math.max(0, nl);
+    });
+  }, []);
+
+  const crash = useCallback(() => {
+    setCrashFlash(true);
+    playBuzz();
+    setTimeout(() => setCrashFlash(false), 350);
+    // Clear obstacles in bottom 3 rows
+    setObstacles((obs) => obs.filter((o) => o.row < PLAYER_ROW - 2));
+    loseLife();
+  }, [loseLife]);
+
+  // Game tick
+  useEffect(() => {
+    if (gameOver) return;
+    const id = setInterval(() => {
+      if (pausedRef.current || overRef.current) return;
+      // Move obstacles down by 1
+      const moved: Obstacle[] = [];
+      let dodgedNow = 0;
+      let crashed = false;
+      for (const o of obstaclesRef.current) {
+        const nr = o.row + 1;
+        if (nr === PLAYER_ROW) {
+          if (o.lane === playerLaneRef.current) {
+            crashed = true;
+            // don't keep this obstacle
+            continue;
           }
-          if (np >= 1 && stopIdx >= STOPS.length) {
-            setFinished(true);
-            setShowFw(true);
-            playCheer();
-            setTimeout(() => setShowFw(false), 1500);
+        }
+        if (nr > PLAYER_ROW) {
+          // passed off-screen → dodged
+          dodgedNow += 1;
+          continue;
+        }
+        moved.push({ ...o, row: nr });
+      }
+      // Spawn new obstacle every 2 ticks (sometimes 1)
+      sinceSpawnRef.current += 1;
+      const spawnEvery = score > 10 ? 2 : 3;
+      if (sinceSpawnRef.current >= spawnEvery) {
+        sinceSpawnRef.current = 0;
+        // avoid stacking too many in top row
+        const topLanes = new Set(moved.filter((o) => o.row <= 1).map((o) => o.lane));
+        const available = [0, 1, 2].filter((l) => !topLanes.has(l));
+        if (available.length > 0) {
+          const lane = available[rand(available.length)];
+          moved.push({ id: nextIdRef.current++, lane, row: 0 });
+        }
+      }
+      setObstacles(moved);
+      if (dodgedNow > 0) {
+        setScore((s) => s + dodgedNow);
+        setDodged((d) => {
+          const nd = d + dodgedNow;
+          // Trigger a question when crossing a multiple of QUESTION_EVERY
+          if (Math.floor(nd / QUESTION_EVERY) > Math.floor(d / QUESTION_EVERY)) {
+            // pick math or arabic
+            const useArabic = speechSupported && Math.random() < 0.5;
+            setQuestion(useArabic ? makeArabic() : makeMath(lang));
           }
-          return np;
+          return nd;
         });
       }
-      rafRef.current = requestAnimationFrame(tick);
+      if (crashed) crash();
+    }, tickMs);
+    tickRef.current = id;
+    return () => clearInterval(id);
+  }, [tickMs, gameOver, crash, lang, speechSupported]);
+
+  // Keyboard controls
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (question || gameOver) return;
+      if (e.key === "ArrowLeft") setPlayerLane((l) => Math.max(0, l - 1));
+      else if (e.key === "ArrowRight") setPlayerLane((l) => Math.min(LANES - 1, l + 1));
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [question, stopIdx, stopQs, finished]);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [question, gameOver]);
 
-  function press(dir: number) {
-    if (question || finished) return;
-    moveDir.current = dir;
-    setMoving(dir !== 0);
+  function moveLeft() {
+    if (question || gameOver) return;
+    setPlayerLane((l) => Math.max(0, l - 1));
   }
-  function release() {
-    moveDir.current = 0;
-    setMoving(false);
+  function moveRight() {
+    if (question || gameOver) return;
+    setPlayerLane((l) => Math.min(LANES - 1, l + 1));
   }
 
-  function answer(opt: string) {
-    if (!question) return;
+  function answerMath(opt: string) {
+    if (!question || question.kind !== "math") return;
     if (opt === question.answer) {
-      setFeedback("ok");
       playCheer();
       setShowFw(true);
-      setTimeout(() => setShowFw(false), 1200);
-      setTimeout(() => {
-        setFeedback(null);
-        setQuestion(null);
-        setStopIdx((i) => i + 1);
-      }, 900);
+      setTimeout(() => setShowFw(false), 1100);
+      setQuestion(null);
     } else {
-      setFeedback("bad");
       playBuzz();
-      setTimeout(() => setFeedback(null), 600);
+      loseLife();
+      setQuestion(null);
     }
   }
 
   function reset() {
-    setProgress(0);
-    setStopIdx(0);
+    setPlayerLane(1);
+    setObstacles([]);
+    setScore(0);
+    setDodged(0);
+    setLives(START_LIVES);
     setQuestion(null);
-    setFeedback(null);
-    setFinished(false);
-    setStopQs(STOPS.map(() => makeQuestion(lang)));
+    setGameOver(false);
+    overRef.current = false;
+    sinceSpawnRef.current = 0;
   }
 
-  // Curved isometric path (S-curve) — compute truck position
-  const pathPoint = useMemo(() => {
-    return (p: number) => {
-      // S curve from left-bottom to right-top
-      const x = 8 + p * 84; // %
-      const y = 78 - Math.sin(p * Math.PI * 1.5) * 30 - p * 10;
-      return { x, y };
-    };
-  }, []);
+  const closeArabic = (ok: boolean) => {
+    if (ok) {
+      playCheer();
+      setShowFw(true);
+      setTimeout(() => setShowFw(false), 1100);
+    } else {
+      playBuzz();
+      loseLife();
+    }
+    setQuestion(null);
+  };
 
-  const pos = pathPoint(progress);
+  // Build grid cells for rendering
+  const cellOn = (r: number, c: number) => {
+    if (r === PLAYER_ROW && c === playerLane) return true;
+    return obstacles.some((o) => o.row === r && o.lane === c);
+  };
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-200 px-4 py-4 overflow-hidden">
+    <div className="flex min-h-screen flex-col items-center bg-gradient-to-b from-amber-100 to-amber-200 px-4 py-4">
       {showFw && <Fireworks />}
 
       {/* Top bar */}
-      <div className="z-10 flex w-full max-w-5xl items-center justify-between gap-2">
-        <Link to="/" className="rounded-full bg-white/90 px-4 py-2 text-sm font-bold shadow">← Home</Link>
-        <div className="flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 shadow">
-          <span className="text-xl">🏁</span>
-          <div className="h-3 w-48 overflow-hidden rounded-full bg-gray-200">
-            <div className="h-full bg-gradient-to-r from-orange-400 to-red-500 transition-all" style={{ width: `${progress * 100}%` }} />
-          </div>
-          <span className="text-xs font-bold">{toLang(stopIdx, lang)}/{toLang(3, lang)}</span>
-        </div>
+      <div className="z-10 flex w-full max-w-md items-center justify-between gap-2">
+        <Link to="/" className="rounded-full bg-white/90 px-4 py-2 text-sm font-bold shadow">
+          ← Home
+        </Link>
         <button
           onClick={() => setLang(lang === "en" ? "ar" : "en")}
           className="rounded-full bg-white/90 px-4 py-2 text-sm font-bold shadow"
@@ -216,140 +288,96 @@ function RacePage() {
         </button>
       </div>
 
-      {/* Scene */}
-      <div className="relative mt-4 w-full max-w-5xl flex-1" style={{ height: "60vh", minHeight: 380 }}>
-        {/* Sky decorations */}
-        <div className="absolute left-[10%] top-[5%] text-5xl">☁️</div>
-        <div className="absolute right-[15%] top-[10%] text-4xl">☀️</div>
-        <div className="absolute left-[60%] top-[3%] text-3xl">☁️</div>
-
-        {/* Isometric ground */}
-        <div className="absolute inset-0" style={{ perspective: "800px" }}>
-          <div
-            className="absolute inset-0 rounded-3xl"
-            style={{
-              background: "linear-gradient(180deg, #86efac 0%, #4ade80 60%, #22c55e 100%)",
-              transform: "rotateX(45deg) translateY(20%)",
-              transformOrigin: "center bottom",
-              boxShadow: "inset 0 -40px 60px rgba(0,0,0,0.15)",
-            }}
-          />
+      {/* Lives + score */}
+      <div className="z-10 mt-3 flex w-full max-w-md items-center justify-between rounded-full bg-white/90 px-4 py-2 shadow">
+        <div className="text-xl tracking-widest">
+          {Array.from({ length: START_LIVES }).map((_, i) => (
+            <span key={i}>{i < lives ? "❤️" : "🤍"}</span>
+          ))}
         </div>
+        <div className="text-sm font-extrabold text-gray-800">
+          {lang === "en" ? "Score" : "النتيجة"}: {toLang(score, lang)}
+        </div>
+      </div>
 
-        {/* SVG track curve */}
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="road" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#4b5563" />
-              <stop offset="100%" stopColor="#1f2937" />
-            </linearGradient>
-          </defs>
-          <path
-            d={buildPath(pathPoint)}
-            stroke="url(#road)"
-            strokeWidth="9"
-            fill="none"
-            strokeLinecap="round"
-          />
-          <path
-            d={buildPath(pathPoint)}
-            stroke="white"
-            strokeWidth="0.6"
-            strokeDasharray="2 2"
-            fill="none"
-            strokeLinecap="round"
-          />
-        </svg>
-
-        {/* Stops (sprites) */}
-        {STOPS.map((s, i) => {
-          const sp = pathPoint(s);
-          const done = i < stopIdx;
-          const active = i === stopIdx;
-          const icons = ["🎯", "⛳", "🏁"];
-          return (
+      {/* LCD bezel */}
+      <div className="mt-4 rounded-[2rem] bg-gradient-to-b from-stone-700 to-stone-900 p-4 shadow-2xl">
+        <div className="rounded-2xl bg-stone-800 p-3 shadow-inner">
+          {/* LCD screen */}
+          <div
+            className={`relative rounded-md p-2 transition-colors duration-200 ${
+              crashFlash ? "bg-red-300" : "bg-[#9bb39a]"
+            }`}
+            style={{
+              boxShadow: "inset 0 4px 12px rgba(0,0,0,0.35)",
+            }}
+          >
             <div
-              key={i}
-              className="absolute -translate-x-1/2 -translate-y-full text-center"
-              style={{ left: `${sp.x}%`, top: `${sp.y}%` }}
+              className="grid gap-[3px]"
+              style={{
+                gridTemplateColumns: `repeat(${LANES}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))`,
+                width: "min(72vw, 240px)",
+                aspectRatio: `${LANES} / ${ROWS}`,
+              }}
             >
-              <div className={`text-5xl drop-shadow-lg transition ${done ? "opacity-30 grayscale" : active ? "animate-bounce" : ""}`}>
-                {icons[i]}
-              </div>
-              <div className="mx-auto -mt-1 h-1 w-8 rounded-full bg-black/30" />
+              {Array.from({ length: ROWS }).map((_, r) =>
+                Array.from({ length: LANES }).map((__, c) => {
+                  const on = cellOn(r, c);
+                  return (
+                    <div
+                      key={`${r}-${c}`}
+                      className="relative rounded-[2px]"
+                      style={{
+                        background: on ? "#1a1f1a" : "rgba(0,0,0,0.08)",
+                        border: on ? "2px solid #9bb39a" : "1px solid rgba(0,0,0,0.06)",
+                        boxShadow: on ? "inset 0 0 0 1px #1a1f1a" : "none",
+                      }}
+                    />
+                  );
+                })
+              )}
             </div>
-          );
-        })}
-
-        {/* Truck sprite */}
-        <img
-          src={truckImg}
-          alt="truck"
-          className="absolute h-auto w-32 -translate-x-1/2 -translate-y-1/2 select-none transition-transform sm:w-40"
-          style={{
-            left: `${pos.x}%`,
-            top: `${pos.y}%`,
-            transform: `translate(-50%, -50%) scaleX(${moveDir.current < 0 ? -1 : 1}) ${moving ? "translateY(-2px)" : ""}`,
-            filter: "drop-shadow(0 8px 6px rgba(0,0,0,0.3))",
-          }}
-          draggable={false}
-        />
-
-        {/* Finish flag */}
-        <div className="absolute" style={{ left: `${pathPoint(1).x}%`, top: `${pathPoint(1).y}%`, transform: "translate(-50%, -100%)" }}>
-          <div className="text-5xl">🏆</div>
+          </div>
+          <div className="mt-2 text-center font-mono text-[10px] tracking-widest text-stone-400">
+            BRICK • RACE
+          </div>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="z-10 mt-3 flex w-full max-w-5xl items-center justify-center gap-4">
+      <div className="z-10 mt-4 flex w-full max-w-md items-center justify-center gap-4">
         <button
-          onPointerDown={() => press(-1)}
-          onPointerUp={release}
-          onPointerLeave={release}
-          disabled={!!question || finished}
-          className="flex h-20 w-24 items-center justify-center rounded-3xl bg-white text-4xl font-extrabold text-gray-800 shadow-xl active:scale-95 disabled:opacity-50"
+          onClick={moveLeft}
+          disabled={!!question || gameOver}
+          className="flex h-20 w-28 items-center justify-center rounded-3xl bg-white text-4xl font-extrabold text-gray-800 shadow-xl active:scale-95 disabled:opacity-50"
         >
           ◀
         </button>
         <button
-          onPointerDown={() => press(1)}
-          onPointerUp={release}
-          onPointerLeave={release}
-          disabled={!!question || finished}
-          className="flex h-20 w-40 items-center justify-center rounded-3xl bg-orange-500 text-3xl font-extrabold text-white shadow-xl active:scale-95 disabled:opacity-50"
-        >
-          🚗 GO
-        </button>
-        <button
-          onPointerDown={() => press(1)}
-          onPointerUp={release}
-          onPointerLeave={release}
-          disabled={!!question || finished}
-          className="flex h-20 w-24 items-center justify-center rounded-3xl bg-white text-4xl font-extrabold text-gray-800 shadow-xl active:scale-95 disabled:opacity-50"
+          onClick={moveRight}
+          disabled={!!question || gameOver}
+          className="flex h-20 w-28 items-center justify-center rounded-3xl bg-white text-4xl font-extrabold text-gray-800 shadow-xl active:scale-95 disabled:opacity-50"
         >
           ▶
         </button>
       </div>
 
-      {/* Question modal */}
-      {question && (
+      {/* Math question */}
+      {question?.kind === "math" && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-          <div className={`w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl transition ${feedback === "bad" ? "ring-8 ring-red-400" : feedback === "ok" ? "ring-8 ring-green-400" : ""}`}>
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
             <div className="mb-2 text-center text-xs font-bold uppercase tracking-wider text-gray-500">
-              {question.type === "math" ? (lang === "en" ? "Math" : "حساب") : (lang === "en" ? "Arabic letter" : "حرف عربي")}
+              {lang === "en" ? "Math" : "حساب"}
             </div>
-            <div
-              dir={question.type === "arabic" ? "rtl" : "ltr"}
-              className="mb-6 text-center text-6xl font-extrabold text-gray-800"
-            >
+            <div className="mb-6 text-center text-6xl font-extrabold text-gray-800">
               {question.prompt}
             </div>
             <div className="grid grid-cols-2 gap-3">
               {question.options.map((o) => (
                 <button
                   key={o}
-                  onClick={() => answer(o)}
+                  onClick={() => answerMath(o)}
                   className="rounded-2xl bg-gradient-to-b from-sky-400 to-sky-600 px-4 py-4 text-2xl font-extrabold text-white shadow-lg active:scale-95 hover:brightness-110"
                 >
                   {o}
@@ -360,16 +388,24 @@ function RacePage() {
         </div>
       )}
 
-      {/* Finish modal */}
-      {finished && (
+      {/* Arabic question */}
+      {question?.kind === "arabic" && (
+        <ArabicQuestionModal
+          word={question.word}
+          onClose={closeArabic}
+        />
+      )}
+
+      {/* Game over */}
+      {gameOver && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl">
-            <div className="mb-4 text-7xl">🏆</div>
+            <div className="mb-4 text-7xl">💥</div>
             <div className="mb-2 text-3xl font-extrabold text-gray-800">
-              {lang === "en" ? "You Won!" : "لقد فزت!"}
+              {lang === "en" ? "Game Over" : "انتهت اللعبة"}
             </div>
             <div className="mb-6 text-gray-600">
-              {lang === "en" ? "Great driving!" : "قيادة رائعة!"}
+              {lang === "en" ? "Score" : "النتيجة"}: {toLang(score, lang)}
             </div>
             <button
               onClick={reset}
@@ -384,11 +420,162 @@ function RacePage() {
   );
 }
 
-function buildPath(fn: (p: number) => { x: number; y: number }) {
-  const pts: string[] = [];
-  for (let i = 0; i <= 40; i++) {
-    const { x, y } = fn(i / 40);
-    pts.push(`${i === 0 ? "M" : "L"} ${x} ${y}`);
+// --- Arabic mic question modal (reuses arabic page logic) ---
+type ArabicStatus = "idle" | "listening" | "correct" | "wrong";
+
+function ArabicQuestionModal({
+  word,
+  onClose,
+}: {
+  word: string;
+  onClose: (ok: boolean) => void;
+}) {
+  const [status, setStatus] = useState<ArabicStatus>("idle");
+  const [heard, setHeard] = useState("");
+  const [supported, setSupported] = useState(true);
+  const recRef = useRef<any>(null);
+  const gotResultRef = useRef(false);
+  const shouldListenRef = useRef(false);
+  const stopTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SR =
+      (typeof window !== "undefined" &&
+        ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) ||
+      null;
+    if (!SR) {
+      setSupported(false);
+      return;
+    }
+    const rec = new SR();
+    rec.lang = "ar-SA";
+    rec.interimResults = true;
+    rec.maxAlternatives = 5;
+    rec.continuous = true;
+    recRef.current = rec;
+    return () => {
+      try { rec.stop(); } catch {}
+    };
+  }, []);
+
+  function listen() {
+    const rec = recRef.current;
+    if (!rec || status === "listening" || status === "correct") return;
+    setHeard("");
+    setStatus("listening");
+    gotResultRef.current = false;
+    shouldListenRef.current = true;
+    const target = normalizeArabic(word);
+
+    const finish = (ok: boolean | null, transcript: string) => {
+      if (gotResultRef.current) return;
+      gotResultRef.current = true;
+      shouldListenRef.current = false;
+      try { rec.stop(); } catch {}
+      if (stopTimerRef.current) { clearTimeout(stopTimerRef.current); stopTimerRef.current = null; }
+      if (ok === null) { setStatus("idle"); return; }
+      setHeard(transcript);
+      if (ok) {
+        setStatus("correct");
+        setTimeout(() => onClose(true), 800);
+      } else {
+        setStatus("wrong");
+        setTimeout(() => onClose(false), 900);
+      }
+    };
+
+    rec.onresult = (ev: any) => {
+      let finalAlts: string[] | null = null;
+      let interimText = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const res = ev.results[i];
+        if (res.isFinal) {
+          finalAlts = [];
+          for (let j = 0; j < res.length; j++) finalAlts.push(res[j].transcript);
+        } else {
+          interimText += res[0].transcript;
+        }
+      }
+      if (finalAlts) {
+        const ok = finalAlts.some((a) => {
+          const n = normalizeArabic(a);
+          return n === target || n.includes(target) || target.includes(n);
+        });
+        finish(ok, finalAlts[0] || "");
+      } else if (interimText) {
+        setHeard(interimText);
+      }
+    };
+    rec.onerror = (ev: any) => {
+      if (ev?.error === "no-speech") return;
+      shouldListenRef.current = false;
+      finish(null, "");
+    };
+    rec.onend = () => {
+      if (shouldListenRef.current && !gotResultRef.current) {
+        try { rec.start(); return; } catch {}
+      }
+      setStatus((s) => (s === "listening" ? "idle" : s));
+    };
+    try { rec.start(); } catch { setStatus("idle"); }
+
+    stopTimerRef.current = setTimeout(() => {
+      if (!gotResultRef.current) {
+        shouldListenRef.current = false;
+        try { rec.stop(); } catch {}
+        // Treat timeout as wrong so the game resumes
+        onClose(false);
+      }
+    }, 15000);
   }
-  return pts.join(" ");
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
+      <div
+        dir="rtl"
+        className="flex w-full max-w-md flex-col items-center gap-4 rounded-3xl bg-white p-6 shadow-2xl"
+      >
+        <div className="text-xs font-bold uppercase tracking-wider text-gray-500">
+          اقرأ الكلمة
+        </div>
+        <div className="text-7xl font-extrabold text-gray-800">{word}</div>
+
+        {!supported && (
+          <div className="rounded-xl bg-[oklch(0.9_0.15_25)] px-4 py-2 text-center text-sm">
+            المتصفح لا يدعم الصوت. استخدم Chrome.
+            <button
+              onClick={() => onClose(true)}
+              className="ml-2 rounded bg-white px-2 py-1 text-xs font-bold"
+            >
+              تخطي
+            </button>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={listen}
+          disabled={!supported || status === "listening" || status === "correct"}
+          aria-label="Listen"
+          className={`flex h-24 w-24 items-center justify-center rounded-full text-5xl text-white shadow-2xl transition active:scale-95 disabled:opacity-60 ${
+            status === "listening"
+              ? "animate-pulse bg-[oklch(0.6_0.22_25)]"
+              : "bg-[oklch(0.65_0.2_260)] hover:scale-110"
+          }`}
+        >
+          🎤
+        </button>
+
+        <div className="min-h-6 text-center text-sm font-bold text-gray-700">
+          {heard && <span>سمعت: {heard}</span>}
+        </div>
+
+        <div className="h-8">
+          {status === "correct" && <div className="animate-bounce text-3xl">🎉 ✅</div>}
+          {status === "wrong" && <div className="text-3xl">😢 ❌</div>}
+          {status === "listening" && <div className="text-base">… يستمع</div>}
+        </div>
+      </div>
+    </div>
+  );
 }

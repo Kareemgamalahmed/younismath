@@ -48,7 +48,16 @@ function Home() {
           <div className="text-sm text-muted-foreground">Pay with coins & notes</div>
         </Link>
 
-        {/* Race game is under construction — hidden for now */}
+        <Link
+          to="/race"
+          className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+        >
+          <div className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.85_0.15_25)] text-6xl shadow-lg group-hover:rotate-6 transition">
+            🏎️
+          </div>
+          <div className="text-2xl font-extrabold text-foreground">Race</div>
+          <div className="text-sm text-muted-foreground">Dodge &amp; answer</div>
+        </Link>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
