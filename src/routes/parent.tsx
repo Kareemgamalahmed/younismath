@@ -119,10 +119,13 @@ function ParentPage() {
           <div className="w-20" />
         </div>
 
+        <RaceSpeedCard />
+
         {/* English */}
         <section className="rounded-3xl bg-white p-6 shadow-xl">
           <h2 className="mb-4 text-xl font-extrabold text-indigo-700">
             Math Skills · English
+          </h2>
           </h2>
           <ol className="space-y-3">
             {PHASES_EN.map((p) => (
