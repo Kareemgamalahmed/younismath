@@ -14,6 +14,7 @@ import { Route as RaceRouteImport } from './routes/race'
 import { Route as ParentRouteImport } from './routes/parent'
 import { Route as MathRouteImport } from './routes/math'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as HiddenRouteImport } from './routes/hidden'
 import { Route as CashierRouteImport } from './routes/cashier'
 import { Route as ArabicRouteImport } from './routes/arabic'
 import { Route as IndexRouteImport } from './routes/index'
@@ -43,6 +44,11 @@ const HistoryRoute = HistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HiddenRoute = HiddenRouteImport.update({
+  id: '/hidden',
+  path: '/hidden',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CashierRoute = CashierRouteImport.update({
   id: '/cashier',
   path: '/cashier',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/arabic': typeof ArabicRoute
   '/cashier': typeof CashierRoute
+  '/hidden': typeof HiddenRoute
   '/history': typeof HistoryRoute
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/arabic': typeof ArabicRoute
   '/cashier': typeof CashierRoute
+  '/hidden': typeof HiddenRoute
   '/history': typeof HistoryRoute
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/arabic': typeof ArabicRoute
   '/cashier': typeof CashierRoute
+  '/hidden': typeof HiddenRoute
   '/history': typeof HistoryRoute
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/arabic'
     | '/cashier'
+    | '/hidden'
     | '/history'
     | '/math'
     | '/parent'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/arabic'
     | '/cashier'
+    | '/hidden'
     | '/history'
     | '/math'
     | '/parent'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/arabic'
     | '/cashier'
+    | '/hidden'
     | '/history'
     | '/math'
     | '/parent'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ArabicRoute: typeof ArabicRoute
   CashierRoute: typeof CashierRoute
+  HiddenRoute: typeof HiddenRoute
   HistoryRoute: typeof HistoryRoute
   MathRoute: typeof MathRoute
   ParentRoute: typeof ParentRoute
@@ -171,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hidden': {
+      id: '/hidden'
+      path: '/hidden'
+      fullPath: '/hidden'
+      preLoaderRoute: typeof HiddenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cashier': {
       id: '/cashier'
       path: '/cashier'
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ArabicRoute: ArabicRoute,
   CashierRoute: CashierRoute,
+  HiddenRoute: HiddenRoute,
   HistoryRoute: HistoryRoute,
   MathRoute: MathRoute,
   ParentRoute: ParentRoute,

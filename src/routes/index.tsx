@@ -73,6 +73,17 @@ function Home() {
           <div className="text-2xl font-extrabold text-foreground">Race</div>
           <div className="text-sm text-muted-foreground">Dodge &amp; answer</div>
         </Link>
+
+        <Link
+          to="/hidden"
+          className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+        >
+          <div className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.9_0.13_80)] text-6xl shadow-lg group-hover:rotate-6 transition">
+            🔍
+          </div>
+          <div className="text-2xl font-extrabold text-foreground" dir="rtl">إيجاد الأشياء</div>
+          <div className="text-sm text-muted-foreground">Hidden objects coloring</div>
+        </Link>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3">
