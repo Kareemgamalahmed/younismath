@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TraceRouteImport } from './routes/trace'
 import { Route as RaceRouteImport } from './routes/race'
 import { Route as ParentRouteImport } from './routes/parent'
 import { Route as MathRouteImport } from './routes/math'
@@ -17,6 +18,11 @@ import { Route as CashierRouteImport } from './routes/cashier'
 import { Route as ArabicRouteImport } from './routes/arabic'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TraceRoute = TraceRouteImport.update({
+  id: '/trace',
+  path: '/trace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RaceRoute = RaceRouteImport.update({
   id: '/race',
   path: '/race',
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
+  '/trace': typeof TraceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
+  '/trace': typeof TraceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
+  '/trace': typeof TraceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,8 +100,17 @@ export interface FileRouteTypes {
     | '/math'
     | '/parent'
     | '/race'
+    | '/trace'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/arabic' | '/cashier' | '/history' | '/math' | '/parent' | '/race'
+  to:
+    | '/'
+    | '/arabic'
+    | '/cashier'
+    | '/history'
+    | '/math'
+    | '/parent'
+    | '/race'
+    | '/trace'
   id:
     | '__root__'
     | '/'
@@ -102,6 +120,7 @@ export interface FileRouteTypes {
     | '/math'
     | '/parent'
     | '/race'
+    | '/trace'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -112,10 +131,18 @@ export interface RootRouteChildren {
   MathRoute: typeof MathRoute
   ParentRoute: typeof ParentRoute
   RaceRoute: typeof RaceRoute
+  TraceRoute: typeof TraceRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/trace': {
+      id: '/trace'
+      path: '/trace'
+      fullPath: '/trace'
+      preLoaderRoute: typeof TraceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/race': {
       id: '/race'
       path: '/race'
@@ -176,16 +203,8 @@ const rootRouteChildren: RootRouteChildren = {
   MathRoute: MathRoute,
   ParentRoute: ParentRoute,
   RaceRoute: RaceRoute,
+  TraceRoute: TraceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

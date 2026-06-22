@@ -38,6 +38,21 @@ function Home() {
         </Link>
 
         <Link
+          to="/trace"
+          className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+        >
+          <div
+            dir="rtl"
+            className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.9_0.12_180)] text-5xl font-extrabold text-red-600 shadow-lg group-hover:rotate-6 transition"
+            style={{ fontFamily: '"Noto Naskh Arabic","Amiri",serif' }}
+          >
+            ✍️ أ
+          </div>
+          <div className="text-2xl font-extrabold text-foreground">كشكول</div>
+          <div className="text-sm text-muted-foreground">Trace Arabic letters</div>
+        </Link>
+
+        <Link
           to="/cashier"
           className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
         >
