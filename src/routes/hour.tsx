@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { toLang } from "@/lib/kid";
+import { Fireworks } from "@/components/Fireworks";
 
 export const Route = createFileRoute("/hour")({
   component: HourPage,
@@ -25,20 +26,175 @@ const AR_PHRASES: Record<number, string> = {
   55: "الا خمسه",
 };
 
+type Status = "idle" | "listening" | "evaluating" | "correct" | "wrong";
+
+async function evaluateWithGroq(expected: string, said: string): Promise<boolean> {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY as string | undefined;
+  if (!apiKey) {
+    // Fallback: simple substring check
+    return said.replace(/\s+/g, "").includes(expected.replace(/\s+/g, ""));
+  }
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      temperature: 0,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an Arabic language evaluator for a kids' learning app. You will be given the correct Arabic phrase for a specific time, and the transcript of what the child actually said. Determine if the child's spoken phrase is correct or close enough to the expected phrase, ignoring minor speech-to-text typos or slight dialect differences. Reply ONLY with the exact word 'RIGHT' if it is acceptable, or 'WRONG' if it is incorrect. Do not include any other text or punctuation.",
+        },
+        {
+          role: "user",
+          content: `Correct phrase: '${expected}'. Child said: '${said}'.`,
+        },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`Groq error ${res.status}`);
+  const data = await res.json();
+  const text: string = data?.choices?.[0]?.message?.content ?? "";
+  return /RIGHT/i.test(text);
+}
+
 function HourPage() {
   const [idx, setIdx] = useState(0); // index into a 12*12 grid of (h,m)
   const hour = Math.floor(idx / 12) + 1; // 1..12
   const minute = MINUTES[idx % 12];
 
-  const next = () => setIdx((i) => (i + 1) % (12 * 12));
-  const prev = () => setIdx((i) => (i - 1 + 12 * 12) % (12 * 12));
+  const [status, setStatus] = useState<Status>("idle");
+  const [heard, setHeard] = useState("");
+  const [showFw, setShowFw] = useState(false);
+  const [supported, setSupported] = useState(true);
+  const recRef = useRef<any>(null);
+  const gotResultRef = useRef(false);
+  const shouldListenRef = useRef(false);
+  const stopTimerRef = useRef<any>(null);
 
   // For "الا ..." (to-style) phrases, the spoken hour is the next one
   const isToStyle = minute >= 35;
   const spokenHour = isToStyle ? (hour % 12) + 1 : hour;
+  const expectedPhrase = `الساعه ${toLang(spokenHour, "ar")} ${AR_PHRASES[minute]}`;
+
+  const next = () => {
+    setIdx((i) => (i + 1) % (12 * 12));
+    setStatus("idle");
+    setHeard("");
+  };
+  const prev = () => {
+    setIdx((i) => (i - 1 + 12 * 12) % (12 * 12));
+    setStatus("idle");
+    setHeard("");
+  };
+
+  useEffect(() => {
+    const SR =
+      (typeof window !== "undefined" &&
+        ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) ||
+      null;
+    if (!SR) {
+      setSupported(false);
+      return;
+    }
+    const rec = new SR();
+    rec.lang = "ar-SA";
+    rec.interimResults = true;
+    rec.maxAlternatives = 5;
+    rec.continuous = true;
+    recRef.current = rec;
+  }, []);
+
+  async function handleTranscript(transcript: string) {
+    setStatus("evaluating");
+    try {
+      const ok = await evaluateWithGroq(expectedPhrase, transcript);
+      if (ok) {
+        setStatus("correct");
+        setShowFw(true);
+        setTimeout(() => setShowFw(false), 1500);
+        setTimeout(() => next(), 2000);
+      } else {
+        setStatus("wrong");
+      }
+    } catch {
+      setStatus("wrong");
+    }
+  }
+
+  function listen() {
+    const rec = recRef.current;
+    if (!rec || status === "listening" || status === "evaluating" || status === "correct") return;
+    setHeard("");
+    setStatus("listening");
+    gotResultRef.current = false;
+    shouldListenRef.current = true;
+
+    const finish = (transcript: string | null) => {
+      if (gotResultRef.current) return;
+      gotResultRef.current = true;
+      shouldListenRef.current = false;
+      try { rec.stop(); } catch {}
+      if (stopTimerRef.current) { clearTimeout(stopTimerRef.current); stopTimerRef.current = null; }
+      if (transcript === null) { setStatus("idle"); return; }
+      setHeard(transcript);
+      void handleTranscript(transcript);
+    };
+
+    rec.onresult = (ev: any) => {
+      let finalText: string | null = null;
+      let interimText = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const res = ev.results[i];
+        if (res.isFinal) {
+          finalText = (finalText ?? "") + res[0].transcript;
+        } else {
+          interimText += res[0].transcript;
+        }
+      }
+      if (finalText) finish(finalText);
+      else if (interimText) setHeard(interimText);
+    };
+    rec.onerror = (ev: any) => {
+      if (ev?.error === "no-speech") return;
+      shouldListenRef.current = false;
+      finish(null);
+    };
+    rec.onend = () => {
+      if (shouldListenRef.current && !gotResultRef.current) {
+        try { rec.start(); return; } catch {}
+      }
+      setStatus((s) => (s === "listening" ? "idle" : s));
+    };
+    try {
+      rec.start();
+    } catch {
+      setStatus("idle");
+    }
+
+    stopTimerRef.current = setTimeout(() => {
+      if (!gotResultRef.current) {
+        shouldListenRef.current = false;
+        try { rec.stop(); } catch {}
+        setStatus("idle");
+      }
+    }, 15000);
+  }
+
+  const bgClass =
+    status === "correct"
+      ? "bg-[oklch(0.92_0.15_145)]"
+      : status === "wrong"
+        ? "bg-[oklch(0.9_0.15_25)]"
+        : "bg-gradient-to-b from-sky-50 to-indigo-100";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 to-indigo-100 px-4 py-6">
+    <div className={`min-h-screen px-4 py-6 transition-colors duration-300 ${bgClass}`}>
+      {showFw && <Fireworks />}
       <div className="mx-auto flex max-w-2xl flex-col gap-6">
         <div className="flex items-center justify-between">
           <Link
@@ -67,12 +223,42 @@ function HourPage() {
           </TabsContent>
         </Tabs>
 
-        <div
-          dir="rtl"
-          className="rounded-3xl bg-white p-6 text-center shadow-xl"
-        >
+        <div dir="rtl" className="rounded-3xl bg-white p-6 text-center shadow-xl">
           <div className="text-4xl font-extrabold text-emerald-700 sm:text-5xl">
-            الساعه {toLang(spokenHour, "ar")} {AR_PHRASES[minute]}
+            {expectedPhrase}
+          </div>
+        </div>
+
+        <div dir="rtl" className="flex flex-col items-center gap-4 rounded-3xl bg-white p-6 shadow-xl">
+          <div className="text-sm text-muted-foreground">
+            اضغط على الميكروفون واقرأ الوقت
+          </div>
+          {!supported && (
+            <div className="rounded-xl bg-[oklch(0.9_0.15_25)] px-4 py-2 text-center text-sm">
+              المتصفح لا يدعم التعرف على الصوت. استخدم Chrome.
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={listen}
+            disabled={!supported || status === "listening" || status === "evaluating" || status === "correct"}
+            aria-label="Listen"
+            className={`flex h-24 w-24 items-center justify-center rounded-full text-5xl text-white shadow-2xl transition active:scale-95 disabled:opacity-60 ${
+              status === "listening"
+                ? "animate-pulse bg-[oklch(0.6_0.22_25)]"
+                : "bg-[oklch(0.65_0.2_260)] hover:scale-110"
+            }`}
+          >
+            🎤
+          </button>
+          <div className="min-h-8 text-center text-lg font-bold">
+            {heard && <span>سمعت: {heard}</span>}
+          </div>
+          <div className="flex h-12 items-center justify-center">
+            {status === "evaluating" && <div className="text-2xl">🤔 يفكر...</div>}
+            {status === "correct" && <div className="animate-bounce text-4xl">🎉 ✅ 🎉</div>}
+            {status === "wrong" && <div className="text-4xl">😢 ❌</div>}
+            {status === "listening" && <div className="text-2xl">… يستمع</div>}
           </div>
         </div>
 
