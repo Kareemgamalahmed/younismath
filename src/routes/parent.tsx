@@ -157,6 +157,7 @@ function ParentPage() {
           <div className="w-20" />
         </div>
 
+        <ModuleVisibilityCard />
         <RaceSpeedCard />
 
         {/* English */}
