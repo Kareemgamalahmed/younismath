@@ -13,6 +13,7 @@ import { Route as TraceRouteImport } from './routes/trace'
 import { Route as RaceRouteImport } from './routes/race'
 import { Route as ParentRouteImport } from './routes/parent'
 import { Route as MathRouteImport } from './routes/math'
+import { Route as HourRouteImport } from './routes/hour'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as HiddenRouteImport } from './routes/hidden'
 import { Route as CashierRouteImport } from './routes/cashier'
@@ -37,6 +38,11 @@ const ParentRoute = ParentRouteImport.update({
 const MathRoute = MathRouteImport.update({
   id: '/math',
   path: '/math',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HourRoute = HourRouteImport.update({
+  id: '/hour',
+  path: '/hour',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryRoute = HistoryRouteImport.update({
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/cashier': typeof CashierRoute
   '/hidden': typeof HiddenRoute
   '/history': typeof HistoryRoute
+  '/hour': typeof HourRoute
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/cashier': typeof CashierRoute
   '/hidden': typeof HiddenRoute
   '/history': typeof HistoryRoute
+  '/hour': typeof HourRoute
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/cashier': typeof CashierRoute
   '/hidden': typeof HiddenRoute
   '/history': typeof HistoryRoute
+  '/hour': typeof HourRoute
   '/math': typeof MathRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/cashier'
     | '/hidden'
     | '/history'
+    | '/hour'
     | '/math'
     | '/parent'
     | '/race'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/cashier'
     | '/hidden'
     | '/history'
+    | '/hour'
     | '/math'
     | '/parent'
     | '/race'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/cashier'
     | '/hidden'
     | '/history'
+    | '/hour'
     | '/math'
     | '/parent'
     | '/race'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   CashierRoute: typeof CashierRoute
   HiddenRoute: typeof HiddenRoute
   HistoryRoute: typeof HistoryRoute
+  HourRoute: typeof HourRoute
   MathRoute: typeof MathRoute
   ParentRoute: typeof ParentRoute
   RaceRoute: typeof RaceRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/math'
       fullPath: '/math'
       preLoaderRoute: typeof MathRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hour': {
+      id: '/hour'
+      path: '/hour'
+      fullPath: '/hour'
+      preLoaderRoute: typeof HourRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history': {
@@ -221,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   CashierRoute: CashierRoute,
   HiddenRoute: HiddenRoute,
   HistoryRoute: HistoryRoute,
+  HourRoute: HourRoute,
   MathRoute: MathRoute,
   ParentRoute: ParentRoute,
   RaceRoute: RaceRoute,
@@ -229,12 +250,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
