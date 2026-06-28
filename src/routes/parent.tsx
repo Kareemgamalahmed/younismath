@@ -5,6 +5,44 @@ import {
   setSpeedFactors,
   type SpeedLevel,
 } from "@/lib/kid";
+import { Switch } from "@/components/ui/switch";
+import {
+  ALL_MODULES,
+  getHiddenModules,
+  setHiddenModules,
+  type ModuleId,
+} from "@/lib/modules";
+
+function ModuleVisibilityCard() {
+  const [hidden, setHidden] = useState<ModuleId[]>([]);
+  useEffect(() => { setHidden(getHiddenModules()); }, []);
+  function toggle(id: ModuleId, visible: boolean) {
+    const next = visible
+      ? hidden.filter((m) => m !== id)
+      : Array.from(new Set([...hidden, id]));
+    setHidden(next);
+    setHiddenModules(next);
+  }
+  return (
+    <section className="rounded-3xl bg-white p-6 shadow-xl">
+      <h2 className="mb-1 text-xl font-extrabold text-indigo-700">👁️ Module Visibility</h2>
+      <p className="mb-4 text-sm text-gray-600">
+        Hide modules you don't want your child to see on the home page.
+      </p>
+      <ul className="divide-y">
+        {ALL_MODULES.map((m) => {
+          const visible = !hidden.includes(m.id);
+          return (
+            <li key={m.id} className="flex items-center justify-between py-3">
+              <span className="text-base font-bold">{m.label}</span>
+              <Switch checked={visible} onCheckedChange={(v) => toggle(m.id, v)} />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 export const Route = createFileRoute("/parent")({
   component: ParentPage,
@@ -119,6 +157,7 @@ function ParentPage() {
           <div className="w-20" />
         </div>
 
+        <ModuleVisibilityCard />
         <RaceSpeedCard />
 
         {/* English */}
