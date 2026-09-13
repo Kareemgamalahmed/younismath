@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TraceRouteImport } from './routes/trace'
 import { Route as RaceRouteImport } from './routes/race'
 import { Route as ParentRouteImport } from './routes/parent'
+import { Route as NourRouteImport } from './routes/nour'
 import { Route as MathRouteImport } from './routes/math'
 import { Route as HourRouteImport } from './routes/hour'
 import { Route as HistoryRouteImport } from './routes/history'
@@ -33,6 +34,11 @@ const RaceRoute = RaceRouteImport.update({
 const ParentRoute = ParentRouteImport.update({
   id: '/parent',
   path: '/parent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NourRoute = NourRouteImport.update({
+  id: '/nour',
+  path: '/nour',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MathRoute = MathRouteImport.update({
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof HistoryRoute
   '/hour': typeof HourRoute
   '/math': typeof MathRoute
+  '/nour': typeof NourRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
   '/trace': typeof TraceRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/hour': typeof HourRoute
   '/math': typeof MathRoute
+  '/nour': typeof NourRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
   '/trace': typeof TraceRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/history': typeof HistoryRoute
   '/hour': typeof HourRoute
   '/math': typeof MathRoute
+  '/nour': typeof NourRoute
   '/parent': typeof ParentRoute
   '/race': typeof RaceRoute
   '/trace': typeof TraceRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/hour'
     | '/math'
+    | '/nour'
     | '/parent'
     | '/race'
     | '/trace'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/hour'
     | '/math'
+    | '/nour'
     | '/parent'
     | '/race'
     | '/trace'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/hour'
     | '/math'
+    | '/nour'
     | '/parent'
     | '/race'
     | '/trace'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   HistoryRoute: typeof HistoryRoute
   HourRoute: typeof HourRoute
   MathRoute: typeof MathRoute
+  NourRoute: typeof NourRoute
   ParentRoute: typeof ParentRoute
   RaceRoute: typeof RaceRoute
   TraceRoute: typeof TraceRoute
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/parent'
       fullPath: '/parent'
       preLoaderRoute: typeof ParentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nour': {
+      id: '/nour'
+      path: '/nour'
+      fullPath: '/nour'
+      preLoaderRoute: typeof NourRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/math': {
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryRoute: HistoryRoute,
   HourRoute: HourRoute,
   MathRoute: MathRoute,
+  NourRoute: NourRoute,
   ParentRoute: ParentRoute,
   RaceRoute: RaceRoute,
   TraceRoute: TraceRoute,
@@ -250,3 +271,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

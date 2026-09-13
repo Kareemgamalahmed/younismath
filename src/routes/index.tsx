@@ -117,6 +117,24 @@ function Home() {
             <div className="text-sm text-muted-foreground">Tell the time</div>
           </Link>
         )}
+        {show("nour") && (
+          <Link
+            to="/nour"
+            className="group flex flex-col items-center gap-4 rounded-3xl bg-card p-8 shadow-2xl transition hover:scale-105"
+          >
+            <div
+              dir="rtl"
+              className="flex h-32 w-32 items-center justify-center rounded-full bg-[oklch(0.9_0.12_160)] text-4xl font-extrabold shadow-lg group-hover:-rotate-6 transition"
+              style={{ fontFamily: '"Noto Naskh Arabic","Amiri",serif' }}
+            >
+              📖 نور
+            </div>
+            <div className="text-2xl font-extrabold text-foreground" dir="rtl">
+              نور البيان
+            </div>
+            <div className="text-sm text-muted-foreground">Letters & harakat</div>
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3">

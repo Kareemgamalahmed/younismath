@@ -1,4 +1,12 @@
-export type ModuleId = "math" | "arabic" | "trace" | "cashier" | "race" | "hidden" | "hour";
+export type ModuleId =
+  | "math"
+  | "arabic"
+  | "trace"
+  | "cashier"
+  | "race"
+  | "hidden"
+  | "hour"
+  | "nour";
 
 export const ALL_MODULES: { id: ModuleId; label: string }[] = [
   { id: "math", label: "Math" },
@@ -8,6 +16,7 @@ export const ALL_MODULES: { id: ModuleId; label: string }[] = [
   { id: "race", label: "Race" },
   { id: "hidden", label: "Hidden Objects" },
   { id: "hour", label: "Hour (الساعه)" },
+  { id: "nour", label: "Nour Al-Bayan (نور البيان)" },
 ];
 
 const KEY = "hidden_modules";
