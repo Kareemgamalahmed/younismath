@@ -1,4 +1,12 @@
-export type ModuleId = "math" | "arabic" | "trace" | "cashier" | "race" | "hidden" | "hour";
+export type ModuleId =
+  | "math"
+  | "arabic"
+  | "trace"
+  | "cashier"
+  | "race"
+  | "hidden"
+  | "hour"
+  | "nour";
 
 export const ALL_MODULES: { id: ModuleId; label: string }[] = [
   { id: "math", label: "Math" },
