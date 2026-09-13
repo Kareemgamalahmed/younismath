@@ -16,6 +16,7 @@ export const ALL_MODULES: { id: ModuleId; label: string }[] = [
   { id: "race", label: "Race" },
   { id: "hidden", label: "Hidden Objects" },
   { id: "hour", label: "Hour (الساعه)" },
+  { id: "nour", label: "Nour Al-Bayan (نور البيان)" },
 ];
 
 const KEY = "hidden_modules";
