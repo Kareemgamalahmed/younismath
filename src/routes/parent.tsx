@@ -4,6 +4,15 @@ import {
   getSpeedFactors,
   setSpeedFactors,
   type SpeedLevel,
+  getRaceLimitEnabled,
+  setRaceLimitEnabled,
+  getRacePlayMinutes,
+  setRacePlayMinutes,
+  getRaceLockHours,
+  setRaceLockHours,
+  getRacePlayedSeconds,
+  raceLockStatus,
+  resetRaceLimit,
 } from "@/lib/kid";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -92,6 +101,115 @@ function RaceSpeedCard() {
   );
 }
 
+function RaceTimeLimitCard() {
+  const [enabled, setEnabled] = useState(true);
+  const [minutes, setMinutes] = useState("10");
+  const [hours, setHours] = useState("24");
+  const [statusText, setStatusText] = useState("");
+
+  function refreshStatus() {
+    const st = raceLockStatus();
+    if (st.unlimited) {
+      setStatusText("No limit — the race is always open.");
+    } else if (st.locked) {
+      setStatusText(`🔒 Locked until ${new Date(st.lockedUntil).toLocaleString()}`);
+    } else {
+      const usedMin = Math.floor(getRacePlayedSeconds() / 60);
+      setStatusText(`${usedMin} / ${getRacePlayMinutes()} min used`);
+    }
+  }
+
+  useEffect(() => {
+    setEnabled(getRaceLimitEnabled());
+    setMinutes(String(getRacePlayMinutes()));
+    setHours(String(getRaceLockHours()));
+    refreshStatus();
+    const id = setInterval(refreshStatus, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  function toggle(v: boolean) {
+    setEnabled(v);
+    setRaceLimitEnabled(v);
+    refreshStatus();
+  }
+  function changeMinutes(v: string) {
+    setMinutes(v);
+    const n = Number(v);
+    if (v.trim() !== "" && Number.isFinite(n) && n >= 1) {
+      setRacePlayMinutes(n);
+      refreshStatus();
+    }
+  }
+  function changeHours(v: string) {
+    setHours(v);
+    const n = Number(v);
+    if (v.trim() !== "" && Number.isFinite(n) && n > 0) {
+      setRaceLockHours(n);
+      refreshStatus();
+    }
+  }
+  function unlock() {
+    resetRaceLimit();
+    refreshStatus();
+  }
+
+  return (
+    <section className="rounded-3xl bg-white p-6 shadow-xl">
+      <h2 className="mb-1 text-xl font-extrabold text-amber-700">⏱️ Race Time Limit</h2>
+      <div dir="rtl" className="mb-3 text-sm font-bold text-amber-700">وقت السباق</div>
+
+      <div className="mb-4 flex items-center justify-between rounded-2xl bg-gray-50 p-3">
+        <span className="text-base font-bold">Daily time limit</span>
+        <Switch checked={enabled} onCheckedChange={toggle} />
+      </div>
+
+      <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${enabled ? "" : "pointer-events-none opacity-40"}`}>
+        <label className="flex flex-col gap-1 rounded-2xl bg-gray-50 p-3">
+          <span className="text-sm font-bold">Minutes of play allowed</span>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={minutes}
+            disabled={!enabled}
+            onChange={(e) => changeMinutes(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-lg font-bold"
+          />
+        </label>
+        <label className="flex flex-col gap-1 rounded-2xl bg-gray-50 p-3">
+          <span className="text-sm font-bold">Then lock for (hours)</span>
+          <input
+            type="number"
+            min={0.1}
+            step={0.5}
+            value={hours}
+            disabled={!enabled}
+            onChange={(e) => changeHours(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-lg font-bold"
+          />
+        </label>
+      </div>
+
+      <p className="mt-3 text-sm text-gray-600">
+        After the minutes run out, the race locks for this many hours, then the time refills.
+        Decimals work (0.5 = 30 minutes).
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-3">
+        <span className="text-sm font-bold text-amber-900">{statusText}</span>
+        <button
+          type="button"
+          onClick={unlock}
+          className="rounded-full bg-amber-500 px-4 py-2 text-sm font-bold text-white shadow hover:bg-amber-600"
+        >
+          Unlock now / reset
+        </button>
+      </div>
+    </section>
+  );
+}
+
 const PHASES_EN = [
   { n: 1, t: "Learning the numbers." },
   { n: 2, t: "Learning to count to 10." },
@@ -159,6 +277,7 @@ function ParentPage() {
 
         <ModuleVisibilityCard />
         <RaceSpeedCard />
+        <RaceTimeLimitCard />
 
         {/* English */}
         <section className="rounded-3xl bg-white p-6 shadow-xl">
