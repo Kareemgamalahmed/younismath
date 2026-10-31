@@ -1,6 +1,6 @@
 export type Lang = "en" | "ar";
 
-export const AR_DIGITS = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+export const AR_DIGITS = ["Ù ", "Ù¡", "Ù¢", "Ù£", "Ù¤", "Ù¥", "Ù¦", "Ù§", "Ù¨", "Ù©"];
 
 export function toLang(n: number | string, lang: Lang) {
   const s = String(n);
@@ -93,4 +93,114 @@ export function getRaceHiScore(): number {
 }
 export function setRaceHiScore(n: number) {
   lsSet("kid_race_hiscore", String(n));
+}
+
+
+// --- Race time limit / lockout (localStorage-backed, SSR-safe) ---
+//
+// Model: the parent sets a play budget (minutes) and a lock duration (hours).
+// Play time is counted while a run is active. When the budget is used up the
+// game locks until `lockedUntil`; when that moment passes, the lock clears and
+// the budget refills. The toggle turns the whole thing off (always open).
+// NOTE: this lives in the browser, so it is a soft gate, not tamper-proof.
+
+function numOr(raw: string | null, fallback: number, min: number): number {
+  const n = Number(raw);
+  return raw !== null && Number.isFinite(n) && n >= min ? n : fallback;
+}
+
+export function getRaceLimitEnabled(): boolean {
+  return lsGet("kid_race_limit_enabled") !== "0"; // default: ON
+}
+export function setRaceLimitEnabled(b: boolean) {
+  lsSet("kid_race_limit_enabled", b ? "1" : "0");
+}
+
+export function getRacePlayMinutes(): number {
+  return numOr(lsGet("kid_race_play_minutes"), 10, 1);
+}
+export function setRacePlayMinutes(n: number) {
+  if (Number.isFinite(n) && n >= 1) lsSet("kid_race_play_minutes", String(n));
+}
+
+export function getRaceLockHours(): number {
+  return numOr(lsGet("kid_race_lock_hours"), 24, 0.01);
+}
+export function setRaceLockHours(n: number) {
+  if (Number.isFinite(n) && n > 0) lsSet("kid_race_lock_hours", String(n));
+}
+
+export function getRacePlayedSeconds(): number {
+  return numOr(lsGet("kid_race_played_seconds"), 0, 0);
+}
+export function setRacePlayedSeconds(n: number) {
+  lsSet("kid_race_played_seconds", String(Math.max(0, n)));
+}
+
+export function getRaceLockedUntil(): number {
+  return numOr(lsGet("kid_race_locked_until"), 0, 0);
+}
+export function setRaceLockedUntil(ms: number) {
+  lsSet("kid_race_locked_until", String(Math.max(0, ms)));
+}
+
+export type RaceLockStatus = {
+  locked: boolean;
+  unlimited: boolean;
+  remainingPlaySeconds: number;
+  lockedUntil: number;
+};
+
+/** Current access status. Auto-clears an expired lock and refills the budget. */
+export function raceLockStatus(): RaceLockStatus {
+  if (!getRaceLimitEnabled()) {
+    return { locked: false, unlimited: true, remainingPlaySeconds: Infinity, lockedUntil: 0 };
+  }
+  const now = Date.now();
+  let lockedUntil = getRaceLockedUntil();
+  if (lockedUntil && now >= lockedUntil) {
+    // lock expired -> new window
+    setRaceLockedUntil(0);
+    setRacePlayedSeconds(0);
+    lockedUntil = 0;
+  }
+  if (lockedUntil && now < lockedUntil) {
+    return { locked: true, unlimited: false, remainingPlaySeconds: 0, lockedUntil };
+  }
+  const budget = getRacePlayMinutes() * 60;
+  const used = getRacePlayedSeconds();
+  if (used >= budget) {
+    // Budget is already spent (e.g. the parent lowered the minutes): lock now.
+    lockedUntil = now + getRaceLockHours() * 3600 * 1000;
+    setRaceLockedUntil(lockedUntil);
+    return { locked: true, unlimited: false, remainingPlaySeconds: 0, lockedUntil };
+  }
+  return { locked: false, unlimited: false, remainingPlaySeconds: budget - used, lockedUntil: 0 };
+}
+
+/** Add played time. Trips the lock when the budget is exhausted. Returns fresh status. */
+export function addRacePlaySeconds(delta: number): RaceLockStatus {
+  if (getRaceLimitEnabled() && delta > 0) {
+    const status = raceLockStatus();
+    if (!status.locked) setRacePlayedSeconds(getRacePlayedSeconds() + delta);
+  }
+  return raceLockStatus();
+}
+
+/** Parent override: clear any lock and refill the budget. */
+export function resetRaceLimit() {
+  setRaceLockedUntil(0);
+  setRacePlayedSeconds(0);
+}
+
+/** "2h 05m 09s" / "4m 07s" / "9s" */
+export function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.ceil(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (h > 0) return `${h}h ${pad(m)}m ${pad(sec)}s`;
+  if (m > 0) return `${m}m ${pad(sec)}s`;
+  return `${sec}s`;
 }
