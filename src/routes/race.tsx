@@ -12,6 +12,10 @@ import {
   getRaceHiScore,
   setRaceHiScore,
   type SpeedLevel,
+  raceLockStatus,
+  addRacePlaySeconds,
+  formatDuration,
+  type RaceLockStatus,
 } from "@/lib/kid";
 import { WORDS, normalizeArabic } from "@/lib/arabic";
 
@@ -117,6 +121,8 @@ function RacePage() {
   const [showPalette, setShowPalette] = useState(false);
   const [centerTick, setCenterTick] = useState(0);
   const [tickMs, setTickMs] = useState(520);
+  const [lock, setLock] = useState<RaceLockStatus | null>(null); // null until read on mount
+  const [now, setNow] = useState(() => Date.now());
 
   const startTimeRef = useRef<number>(Date.now());
   const playerLaneRef = useRef(playerLane);
@@ -127,10 +133,16 @@ function RacePage() {
   const sinceSpawnRef = useRef(0);
   const speedLevelRef = useRef<SpeedLevel>(speedLevel);
   const factorsRef = useRef(factors);
+  const lockedRef = useRef(false);
+  const hiddenRef = useRef(false);
 
   useEffect(() => { playerLaneRef.current = playerLane; }, [playerLane]);
   useEffect(() => { obstaclesRef.current = obstacles; }, [obstacles]);
-  useEffect(() => { pausedRef.current = !!question || gameOver; }, [question, gameOver]);
+  const locked = !!lock?.locked;
+  useEffect(() => { lockedRef.current = locked; }, [locked]);
+  useEffect(() => {
+    pausedRef.current = !!question || gameOver || locked || lock === null;
+  }, [question, gameOver, locked, lock]);
   useEffect(() => { overRef.current = gameOver; }, [gameOver]);
   useEffect(() => { speedLevelRef.current = speedLevel; }, [speedLevel]);
   useEffect(() => { factorsRef.current = factors; }, [factors]);
@@ -143,22 +155,72 @@ function RacePage() {
     setHi(getRaceHiScore());
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     setSpeechSupported(!!SR);
+    setLock(raceLockStatus());
   }, []);
 
-  const loseLife = useCallback(() => {
-    setLives((l) => {
-      const nl = l - 1;
-      if (nl <= 0) {
-        setGameOver(true);
-        overRef.current = true;
-        // hi-score update
-        setScore((s) => {
-          if (s > getRaceHiScore()) { setRaceHiScore(s); setHi(s); }
-          return s;
-        });
+  // Pause the game while the tab is hidden (cars shouldn't fall while the child is away).
+  useEffect(() => {
+    const onVis = () => { hiddenRef.current = document.hidden; };
+    onVis();
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
+  // Play-time budget: count real seconds while a run is active (this keeps
+  // counting during question pauses, but not on Game Over / Locked / hidden tab).
+  const counting = !!lock && !lock.unlimited && !lock.locked && !gameOver;
+  useEffect(() => {
+    if (!counting) return;
+    let last = Date.now();
+    const id = setInterval(() => {
+      const t = Date.now();
+      const delta = Math.min(2, (t - last) / 1000); // clamp: sleep/throttle can't over-count
+      last = t;
+      if (hiddenRef.current) return;
+      const st = addRacePlaySeconds(delta);
+      setNow(t);
+      setLock(st);
+      if (st.locked) {
+        // Budget used up: end the run, keep the hi-score, close any open question.
+        if (scoreRef.current > getRaceHiScore()) {
+          setRaceHiScore(scoreRef.current);
+          setHi(scoreRef.current);
+        }
+        setQuestion(null);
+        setObstacles([]);
       }
-      return Math.max(0, nl);
-    });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [counting]);
+
+  // While locked: tick the countdown, and unlock automatically when it expires.
+  useEffect(() => {
+    if (!locked) return;
+    const id = setInterval(() => {
+      setNow(Date.now());
+      const st = raceLockStatus(); // clears an expired lock + refills the budget
+      if (!st.locked) {
+        setLock(st);
+        reset();
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [locked]);
+
+  const livesRef = useRef(START_LIVES);
+  const scoreRef = useRef(0);
+  useEffect(() => { scoreRef.current = score; }, [score]);
+
+  const loseLife = useCallback(() => {
+    const nl = Math.max(0, livesRef.current - 1);
+    livesRef.current = nl;
+    setLives(nl);
+    if (nl <= 0) {
+      overRef.current = true;
+      setGameOver(true);
+      const s = scoreRef.current;
+      if (s > getRaceHiScore()) { setRaceHiScore(s); setHi(s); }
+    }
   }, []);
 
   const crash = useCallback(() => {
@@ -176,7 +238,7 @@ function RacePage() {
     let timer: any;
     const step = () => {
       if (cancelled) return;
-      if (!pausedRef.current && !overRef.current) {
+      if (!pausedRef.current && !overRef.current && !hiddenRef.current) {
         const moved: Obstacle[] = [];
         let dodgedNow = 0;
         let crashed = false;
@@ -230,7 +292,7 @@ function RacePage() {
   // Keyboard
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (question || gameOver) return;
+      if (question || gameOver || lockedRef.current) return;
       if (e.key === "ArrowLeft") setPlayerLane((l) => Math.max(0, l - 1));
       else if (e.key === "ArrowRight") setPlayerLane((l) => Math.min(LANES - 1, l + 1));
     };
@@ -257,7 +319,8 @@ function RacePage() {
 
   function reset() {
     setPlayerLane(1); setObstacles([]); setScore(0); setDodged(0);
-    setLives(START_LIVES); setQuestion(null); setGameOver(false);
+    setLives(START_LIVES); livesRef.current = START_LIVES;
+    setQuestion(null); setGameOver(false);
     overRef.current = false; sinceSpawnRef.current = 0;
     startTimeRef.current = Date.now();
   }
@@ -310,6 +373,11 @@ function RacePage() {
         <Link to="/" className="rounded-full bg-white/90 px-4 py-2 text-sm font-bold shadow">
           ← Home
         </Link>
+        {lock && !lock.unlimited && !lock.locked && (
+          <div className="rounded-full bg-white/90 px-3 py-2 text-xs font-extrabold text-amber-700 shadow">
+            ⏱ {formatDuration(lock.remainingPlaySeconds)}
+          </div>
+        )}
         <button
           onClick={() => setLang(lang === "en" ? "ar" : "en")}
           className="rounded-full bg-white/90 px-4 py-2 text-sm font-bold shadow"
@@ -460,7 +528,30 @@ function RacePage() {
       )}
 
       {question?.kind === "arabic" && (
-        <ArabicQuestionModal word={question.word} onClose={closeArabic} />
+        <ArabicQuestionModal word={question.word} lang={lang} onClose={closeArabic} />
+      )}
+
+      {locked && lock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl">
+            <div className="mb-3 text-7xl">😴</div>
+            <div className="mb-2 text-3xl font-extrabold text-gray-800">
+              {lang === "en" ? "Time's up for now!" : "انتهى الوقت الآن!"}
+            </div>
+            <div className="mb-1 text-gray-600">
+              {lang === "en" ? "Come back in" : "ارجع بعد"}
+            </div>
+            <div className="mb-6 text-4xl font-extrabold text-amber-600" dir="ltr">
+              🔒 {formatDuration((lock.lockedUntil - now) / 1000)}
+            </div>
+            <Link
+              to="/"
+              className="inline-block rounded-full bg-orange-500 px-8 py-3 text-lg font-bold text-white shadow-lg hover:bg-orange-600"
+            >
+              ← {lang === "en" ? "Home" : "الرئيسية"}
+            </Link>
+          </div>
+        </div>
       )}
 
       {gameOver && (
@@ -552,7 +643,7 @@ function SpeedGauge({ level, onPick }: { level: SpeedLevel; onPick: (l: SpeedLev
 // ---------- Arabic mic modal ----------
 type ArabicStatus = "idle" | "listening" | "correct" | "wrong";
 
-function ArabicQuestionModal({ word, onClose }: { word: string; onClose: (ok: boolean) => void }) {
+function ArabicQuestionModal({ word, lang, onClose }: { word: string; lang: Lang; onClose: (ok: boolean) => void }) {
   const [status, setStatus] = useState<ArabicStatus>("idle");
   const [heard, setHeard] = useState("");
   const [supported, setSupported] = useState(true);
@@ -567,7 +658,10 @@ function ArabicQuestionModal({ word, onClose }: { word: string; onClose: (ok: bo
     const rec = new SR();
     rec.lang = "ar-SA"; rec.interimResults = true; rec.maxAlternatives = 5; rec.continuous = true;
     recRef.current = rec;
-    return () => { try { rec.stop(); } catch {} };
+    return () => {
+      try { rec.stop(); } catch {}
+      if (stopTimerRef.current) { clearTimeout(stopTimerRef.current); stopTimerRef.current = null; }
+    };
   }, []);
 
   function listen() {
@@ -647,6 +741,14 @@ function ArabicQuestionModal({ word, onClose }: { word: string; onClose: (ok: bo
         <div className="min-h-6 text-center text-sm font-bold text-gray-700">
           {heard && <span>سمعت: {heard}</span>}
         </div>
+        <button
+          type="button"
+          onClick={() => onClose(false)}
+          disabled={status === "correct" || status === "wrong"}
+          className="rounded-full bg-gray-100 px-4 py-1 text-xs font-bold text-gray-600 shadow disabled:opacity-40"
+        >
+          {lang === "en" ? "Skip (−1 ❤️)" : "تخطي (−١ ❤️)"}
+        </button>
         <div className="h-8">
           {status === "correct" && <div className="animate-bounce text-3xl">🎉 ✅</div>}
           {status === "wrong" && <div className="text-3xl">😢 ❌</div>}
