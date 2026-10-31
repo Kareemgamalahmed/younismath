@@ -258,7 +258,140 @@ const PHASES_AR = [
   },
 ];
 
+// ---------- Parent gate ----------
+// A multiplication question a young child can't answer. Once passed, the page
+// stays open for GATE_MINUTES in this browser tab (sessionStorage), then re-locks.
+const GATE_KEY = "parent_unlocked_until";
+const GATE_MINUTES = 15;
+const MAX_TRIES = 3;
+const COOLDOWN_SECONDS = 30;
+
+function gateIsOpen(): boolean {
+  try {
+    return Number(sessionStorage.getItem(GATE_KEY)) > Date.now();
+  } catch {
+    return false;
+  }
+}
+function gateOpen() {
+  try {
+    sessionStorage.setItem(GATE_KEY, String(Date.now() + GATE_MINUTES * 60_000));
+  } catch {
+    /* ignore */
+  }
+}
+function gateClose() {
+  try {
+    sessionStorage.removeItem(GATE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+function newQuestion() {
+  const a = 6 + Math.floor(Math.random() * 4); // 6..9
+  const b = 6 + Math.floor(Math.random() * 4);
+  return { a, b };
+}
+
+function ParentGate({ onPass }: { onPass: () => void }) {
+  const [q, setQ] = useState<{ a: number; b: number } | null>(null);
+  const [value, setValue] = useState("");
+  const [wrong, setWrong] = useState(0);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => { setQ(newQuestion()); }, []);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setInterval(() => setCooldown((c) => Math.max(0, c - 1)), 1000);
+    return () => clearInterval(id);
+  }, [cooldown > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!q || cooldown > 0) return;
+    if (Number(value.trim()) === q.a * q.b) {
+      gateOpen();
+      onPass();
+      return;
+    }
+    const w = wrong + 1;
+    setValue("");
+    setQ(newQuestion());
+    if (w >= MAX_TRIES) {
+      setWrong(0);
+      setCooldown(COOLDOWN_SECONDS);
+    } else {
+      setWrong(w);
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-50 to-indigo-100 px-4">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-xl"
+      >
+        <div className="mb-2 text-6xl">🔒</div>
+        <h1 className="text-2xl font-extrabold text-indigo-900">Parents only</h1>
+        <div dir="rtl" className="mb-5 text-lg font-bold text-indigo-700">للأهل فقط</div>
+
+        <div className="mb-3 text-4xl font-extrabold text-gray-800" dir="ltr">
+          {q ? `${q.a} × ${q.b} = ?` : "…"}
+        </div>
+
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          autoComplete="off"
+          value={value}
+          disabled={cooldown > 0 || !q}
+          onChange={(e) => setValue(e.target.value.replace(/\D/g, "").slice(0, 3))}
+          aria-label="Answer"
+          className="mb-3 w-full rounded-xl border-2 border-gray-300 px-4 py-3 text-center text-3xl font-extrabold disabled:opacity-50"
+        />
+
+        {wrong > 0 && cooldown === 0 && (
+          <div className="mb-3 text-sm font-bold text-red-600">Not quite — try again</div>
+        )}
+        {cooldown > 0 && (
+          <div className="mb-3 text-sm font-bold text-red-600">
+            Too many tries. Wait {cooldown}s
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={cooldown > 0 || !q || value === ""}
+          className="mb-3 w-full rounded-full bg-indigo-600 px-6 py-3 text-lg font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50"
+        >
+          Enter
+        </button>
+        <Link to="/" className="text-sm font-bold text-gray-500 hover:text-gray-700">
+          ← Home
+        </Link>
+      </form>
+    </div>
+  );
+}
+
 function ParentPage() {
+  const [open, setOpen] = useState<boolean | null>(null); // null until read on the client
+  useEffect(() => { setOpen(gateIsOpen()); }, []);
+  if (open === null) return <div className="min-h-screen bg-slate-50" />;
+  if (!open) return <ParentGate onPass={() => setOpen(true)} />;
+  return (
+    <ParentContent
+      onLock={() => {
+        gateClose();
+        setOpen(false);
+      }}
+    />
+  );
+}
+
+function ParentContent({ onLock }: { onLock: () => void }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-indigo-100 px-4 py-6">
       <div className="mx-auto flex max-w-4xl flex-col gap-6">
@@ -272,7 +405,13 @@ function ParentPage() {
           <h1 className="text-2xl font-extrabold text-indigo-900 sm:text-3xl">
             👨‍👩‍👧 Parent Progress
           </h1>
-          <div className="w-20" />
+          <button
+            type="button"
+            onClick={onLock}
+            className="rounded-full bg-white px-4 py-2 text-sm font-bold shadow hover:bg-gray-50"
+          >
+            🔒 Lock
+          </button>
         </div>
 
         <ModuleVisibilityCard />
